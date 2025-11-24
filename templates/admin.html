@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票数据管理</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; padding-top: 30px; }
+        .main-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .text-end { text-align: right !important; }
+        thead th {
+            background-color: #e9ecef;
+            font-weight: 600;
+        }
+        .form-container {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">📊 股票数据管理</h2>
+            <div>
+                <a href="/monitor" class="btn btn-outline-secondary me-2">📊 加仓监控</a>
+                <a href="/" class="btn btn-secondary">返回首页</a>
+            </div>
+        </div>
+        
+        <!-- 添加/编辑表单 -->
+        <div class="form-container">
+            <h4 id="form-title">股票资产管理</h4>
+            <form id="stock-form">
+                <input type="hidden" id="edit-id" value="">
+                <div class="row align-items-end">
+                    <div class="col-md-3 mb-3">
+                        <label for="code" class="form-label">股票代码</label>
+                        <input type="text" class="form-control" id="code" placeholder="例如: sh600900, sz000895" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="name" class="form-label">股票名称</label>
+                        <input type="text" class="form-control" id="name" required>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="cost_price" class="form-label">成本价格</label>
+                        <input type="number" class="form-control" id="cost_price" step="0.01" required>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="shares" class="form-label">持仓股数</label>
+                        <input type="number" class="form-control" id="shares" required>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <button type="submit" class="btn btn-primary w-100">保存</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- 股票列表 -->
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>股票代码</th>
+                        <th>名称</th>
+                        <th class="text-end">成本价格</th>
+                        <th class="text-end">持仓股数</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="stocks-table-body">
+                    <tr><td colspan="5" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 监控股票管理 -->
+        <div class="form-container mt-5">
+            <h4>监控股票管理</h4>
+            <form id="monitor-form">
+                <input type="hidden" id="monitor-edit-id" value="">
+                <div class="row align-items-end">
+                    <div class="col-md-3 mb-3">
+                        <label for="monitor-code" class="form-label">股票代码</label>
+                        <input type="text" class="form-control" id="monitor-code" placeholder="例如: sh600900, sz000895" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="monitor-name" class="form-label">股票名称</label>
+                        <input type="text" class="form-control" id="monitor-name" required>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="monitor-timeframe" class="form-label">时间维度</label>
+                        <select class="form-control" id="monitor-timeframe" required>
+                            <option value="1d">日K线</option>
+                            <option value="2d">2日K线</option>
+                            <option value="3d">3日K线</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <button type="submit" class="btn btn-primary w-100">添加监控股票</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- 监控股票列表 -->
+        <div class="table-responsive mt-3">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>股票代码</th>
+                        <th>名称</th>
+                        <th class="text-center">时间维度</th>
+                        <th class="text-center">状态</th>
+                        <th class="text-end">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="monitor-table-body">
+                    <tr><td colspan="5" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let editingStock = null;
+        let editingMonitorStock = null;
+        
+        // 工具函数：格式化数字为金额字符串
+        function formatMoney(num) {
+            if (num === undefined || num === null) return '-';
+            return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        
+        // 核心函数：从 API 获取股票数据并更新页面
+        async function loadStocks() {
+            try {
+                const response = await fetch('/api/stocks');
+                const stocks = await response.json();
+                
+                const tbody = document.getElementById('stocks-table-body');
+                tbody.innerHTML = '';
+                
+                if (stocks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">暂无股票数据</td></tr>';
+                    return;
+                }
+                
+                stocks.forEach(stock => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${stock.code}</td>
+                        <td>${stock.name}</td>
+                        <td class="text-end">${formatMoney(stock.cost_price)}</td>
+                        <td class="text-end">${stock.shares.toLocaleString()}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-2" onclick="editStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">编辑</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteStock('${stock.code}')">删除</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error("加载股票数据失败:", error);
+                document.getElementById('stocks-table-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">加载数据失败</td></tr>';
+            }
+        }
+        
+        // 添加或更新股票
+        async function saveStock(event) {
+            event.preventDefault();
+            
+            const code = document.getElementById('code').value.trim();
+            const name = document.getElementById('name').value.trim();
+            const costPrice = document.getElementById('cost_price').value;
+            const shares = document.getElementById('shares').value;
+            
+            if (!code || !name || !costPrice || !shares) {
+                alert('请填写所有字段');
+                return;
+            }
+            
+            const stockData = {
+                code: code,
+                name: name,
+                cost_price: parseFloat(costPrice),
+                shares: parseInt(shares)
+            };
+            
+            let url, method;
+            if (editingStock) {
+                // 更新现有股票
+                url = `/api/stocks/${editingStock.code}`;
+                method = 'PUT';
+            } else {
+                // 添加新股票
+                url = '/api/stocks';
+                method = 'POST';
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(stockData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(result.message);
+                    resetForm();
+                    loadStocks();
+                } else {
+                    alert(result.message || '操作失败');
+                }
+            } catch (error) {
+                console.error("保存股票失败:", error);
+                alert('保存失败，请检查网络连接');
+            }
+        }
+        
+        // 编辑股票
+        function editStock(stock) {
+            editingStock = stock;
+            
+            document.getElementById('form-title').textContent = '编辑股票';
+            document.getElementById('code').value = stock.code;
+            document.getElementById('name').value = stock.name;
+            document.getElementById('cost_price').value = stock.cost_price;
+            document.getElementById('shares').value = stock.shares;
+            
+            // 禁用代码字段编辑
+            document.getElementById('code').disabled = true;
+        }
+        
+        // 删除股票
+        async function deleteStock(code) {
+            if (!confirm(`确定要删除股票 ${code} 吗？此操作不可撤销。`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/stocks/${code}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(result.message);
+                    loadStocks();
+                } else {
+                    alert(result.message || '删除失败');
+                }
+            } catch (error) {
+                console.error("删除股票失败:", error);
+                alert('删除失败，请检查网络连接');
+            }
+        }
+        
+        // 重置表单
+        function resetForm() {
+            document.getElementById('stock-form').reset();
+            document.getElementById('form-title').textContent = '添加股票';
+            document.getElementById('code').disabled = false;
+            editingStock = null;
+        }
+        
+        // ========== 监控股票管理功能 ==========
+        
+        // 加载监控股票数据
+        async function loadMonitorStocks() {
+            try {
+                const response = await fetch('/api/monitor-stocks');
+                const stocks = await response.json();
+                
+                const tbody = document.getElementById('monitor-table-body');
+                tbody.innerHTML = '';
+                
+                if (stocks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">暂无监控股票数据</td></tr>';
+                    return;
+                }
+                
+                stocks.forEach(stock => {
+                    const tr = document.createElement('tr');
+                    const timeframeMap = {
+                        '1d': '日K线',
+                        '2d': '2日K线',
+                        '3d': '3日K线'
+                    };
+                    
+                    const statusBadge = stock.enabled ? 
+                        '<span class="badge bg-success">启用</span>' : 
+                        '<span class="badge bg-secondary">禁用</span>';
+                    
+                    tr.innerHTML = `
+                        <td>${stock.code}</td>
+                        <td>${stock.name}</td>
+                        <td class="text-center">${timeframeMap[stock.timeframe] || stock.timeframe}</td>
+                        <td class="text-center">${statusBadge}</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary me-2" onclick="editMonitorStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">编辑</button>
+                            <button class="btn btn-sm btn-outline-${stock.enabled ? 'warning' : 'success'} me-2" onclick="toggleMonitorStock('${stock.code}', ${!stock.enabled})">${stock.enabled ? '禁用' : '启用'}</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteMonitorStock('${stock.code}')">删除</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error("加载监控股票数据失败:", error);
+                document.getElementById('monitor-table-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">加载数据失败</td></tr>';
+            }
+        }
+        
+        // 保存监控股票
+        async function saveMonitorStock(event) {
+            event.preventDefault();
+            
+            const code = document.getElementById('monitor-code').value.trim();
+            const name = document.getElementById('monitor-name').value.trim();
+            const timeframe = document.getElementById('monitor-timeframe').value;
+            
+            if (!code || !name || !timeframe) {
+                alert('请填写所有字段');
+                return;
+            }
+            
+            const stockData = {
+                code: code,
+                name: name,
+                timeframe: timeframe
+            };
+            
+            let url, method;
+            if (editingMonitorStock) {
+                // 更新现有监控股票
+                url = `/api/monitor-stocks/${editingMonitorStock.code}`;
+                method = 'PUT';
+                stockData.enabled = editingMonitorStock.enabled;
+            } else {
+                // 添加新监控股票
+                url = '/api/monitor-stocks';
+                method = 'POST';
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(stockData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(result.message);
+                    resetMonitorForm();
+                    loadMonitorStocks();
+                } else {
+                    alert(result.message || '操作失败');
+                }
+            } catch (error) {
+                console.error("保存监控股票失败:", error);
+                alert('保存失败，请检查网络连接');
+            }
+        }
+        
+        // 编辑监控股票
+        function editMonitorStock(stock) {
+            editingMonitorStock = stock;
+            
+            document.getElementById('monitor-code').value = stock.code;
+            document.getElementById('monitor-name').value = stock.name;
+            document.getElementById('monitor-timeframe').value = stock.timeframe;
+            
+            // 禁用代码字段编辑
+            document.getElementById('monitor-code').disabled = true;
+        }
+        
+        // 删除监控股票
+        async function deleteMonitorStock(code) {
+            if (!confirm(`确定要删除监控股票 ${code} 吗？此操作不可撤销。`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/monitor-stocks/${code}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(result.message);
+                    loadMonitorStocks();
+                } else {
+                    alert(result.message || '删除失败');
+                }
+            } catch (error) {
+                console.error("删除监控股票失败:", error);
+                alert('删除失败，请检查网络连接');
+            }
+        }
+        
+        // 启用/禁用监控股票
+        async function toggleMonitorStock(code, enabled) {
+            try {
+                const response = await fetch(`/api/monitor-stocks/${code}/toggle`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ enabled: enabled })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert(result.message);
+                    loadMonitorStocks();
+                } else {
+                    alert(result.message || '操作失败');
+                }
+            } catch (error) {
+                console.error("切换监控股票状态失败:", error);
+                alert('操作失败，请检查网络连接');
+            }
+        }
+        
+        // 重置监控表单
+        function resetMonitorForm() {
+            document.getElementById('monitor-form').reset();
+            document.getElementById('monitor-code').disabled = false;
+            editingMonitorStock = null;
+        }
+        
+        // 页面加载完成后自动执行
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStocks();
+            loadMonitorStocks();
+            document.getElementById('stock-form').addEventListener('submit', saveStock);
+            document.getElementById('monitor-form').addEventListener('submit', saveMonitorStock);
+        });
+    </script>
+</body>
+</html>

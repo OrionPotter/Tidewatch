@@ -1,0 +1,471 @@
+import akshare as ak
+import pandas as pd
+from datetime import datetime, timedelta
+import os
+from db import get_all_stocks
+import asyncio
+import aiohttp
+from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
+import time
+
+# 简单的内存缓存，用于存储K线数据
+kline_cache = {}
+cache_expire_time = {}  # 缓存过期时间
+
+# --- 网络连接设置（解决常见的网络连接问题） ---
+# 尝试清除代理设置，这在某些网络环境下可能导致连接问题
+os.environ.pop('http_proxy', None)
+os.environ.pop('https_proxy', None)
+os.environ.pop('all_proxy', None)
+# ---------------------------------------------------
+
+def get_real_time_price(stock_code, max_retries=3):
+    """
+    获取单个股票的实时价格，使用stock_individual_spot_xq接口（雪球）
+    返回: (stock_code, current_price, dividend_ttm, dividend_yield_ttm)
+    """
+    for i in range(max_retries):
+        try:
+            # 使用 stock_individual_spot_xq API 获取实时价格（雪球接口）
+            # 需要添加市场前缀（SH 或 SZ）
+            if stock_code.startswith('sh'):
+                symbol = 'SH' + stock_code[2:]  # 转换为雪球格式
+            elif stock_code.startswith('sz'):
+                symbol = 'SZ' + stock_code[2:]  # 转换为雪球格式
+            else:
+                # 如果没有前缀，根据代码判断市场
+                if stock_code.startswith('6'):  # 上交所
+                    symbol = 'SH' + stock_code
+                elif stock_code.startswith('0') or stock_code.startswith('3'):  # 深交所
+                    symbol = 'SZ' + stock_code
+                else:
+                    symbol = stock_code  # 其他情况，直接使用
+
+            spot_data = ak.stock_individual_spot_xq(symbol=symbol)
+            
+            if spot_data is not None and not spot_data.empty:
+                # 查找现价字段
+                current_price = None
+                dividend_ttm = None
+                dividend_yield_ttm = None
+                
+                if '现价' in spot_data['item'].values:
+                    price_row = spot_data[spot_data['item'] == '现价']
+                    if not price_row.empty:
+                        price_value = price_row['value'].iloc[0]
+                        if price_value is not None and str(price_value) != 'nan' and float(price_value) > 0:
+                            current_price = float(price_value)
+                
+                # 如果没有找到"现价"，尝试找"最新价"
+                if current_price is None and '最新价' in spot_data['item'].values:
+                    price_row = spot_data[spot_data['item'] == '最新价']
+                    if not price_row.empty:
+                        price_value = price_row['value'].iloc[0]
+                        if price_value is not None and str(price_value) != 'nan' and float(price_value) > 0:
+                            current_price = float(price_value)
+                
+                # 获取股息(TTM)
+                if '股息(TTM)' in spot_data['item'].values:
+                    dividend_row = spot_data[spot_data['item'] == '股息(TTM)']
+                    if not dividend_row.empty:
+                        dividend_value = dividend_row['value'].iloc[0]
+                        if dividend_value is not None and str(dividend_value) != 'nan':
+                            dividend_ttm = float(dividend_value)
+                
+                # 获取股息率(TTM)
+                if '股息率(TTM)' in spot_data['item'].values:
+                    yield_row = spot_data[spot_data['item'] == '股息率(TTM)']
+                    if not yield_row.empty:
+                        yield_value = yield_row['value'].iloc[0]
+                        if yield_value is not None and str(yield_value) != 'nan':
+                            dividend_yield_ttm = float(yield_value)
+                
+                if current_price is not None:
+                    print(f"通过 stock_individual_spot_xq 成功获取 {stock_code} 的价格: {current_price}, 股息(TTM): {dividend_ttm}, 股息率(TTM): {dividend_yield_ttm}")
+                    return stock_code, current_price, dividend_ttm, dividend_yield_ttm
+        except Exception as e:
+            if i < max_retries - 1:
+                time.sleep(2)  # 增加等待时间
+            else:
+                print(f"获取 {stock_code} 实时价格失败 (雪球接口): {str(e)[:100]}...")
+    
+    print(f"获取 {stock_code} 实时价格失败，将使用成本价作为当前价格。")
+    return stock_code, None, None, None
+
+
+def get_stock_data_parallel(stock_codes, max_workers=7):
+    """
+    并发获取多个股票的数据
+    """
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 提交所有任务
+        futures = [executor.submit(get_real_time_price, code) for code in stock_codes]
+        
+        # 收集结果
+        results = []
+        for future in futures:
+            results.append(future.result())
+    
+    return results
+
+def get_portfolio_data():
+    """
+    核心函数：获取实时数据并计算投资组合的所有指标。
+    返回: (list, dict) -> (表格明细数据列表, 总计数据字典)
+    """
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始获取雪球数据...")
+    
+    # 从数据库获取所有股票数据
+    stocks = get_all_stocks()
+    
+    # 提取股票代码列表
+    stock_codes = [stock[1] for stock in stocks]  # stock[1] 是股票代码
+    
+    # 并发获取所有股票的实时数据
+    print(f"开始并发获取 {len(stock_codes)} 只股票的数据...")
+    start_time = time.time()
+    stock_results = get_stock_data_parallel(stock_codes)
+    end_time = time.time()
+    print(f"并发获取数据完成，耗时 {end_time - start_time:.2f} 秒")
+    
+    # 创建股票代码到股票信息的映射
+    stock_info_map = {}
+    for i, stock_row in enumerate(stocks):
+        stock_id, stock_code, name, cost_price, shares = stock_row
+        stock_info_map[stock_code] = {
+            'name': name,
+            'cost_price': cost_price,
+            'shares': shares,
+            'original_index': i
+        }
+    
+    # 创建股票代码到实时数据的映射
+    stock_data_map = {}
+    for result in stock_results:
+        stock_code, current_price, dividend_ttm, dividend_yield_ttm = result
+        stock_data_map[stock_code] = {
+            'current_price': current_price,
+            'dividend_ttm': dividend_ttm,
+            'dividend_yield_ttm': dividend_yield_ttm
+        }
+    
+    calculated_rows = []
+    
+    # 初始化总计变量
+    total_summary = {
+        "market_value": 0,
+        "profit": 0,
+        "annual_dividend": 0
+    }
+
+    # 处理每只股票的计算
+    for stock_row in stocks:
+        stock_id, stock_code, name, cost_price, shares = stock_row
+        # 创建这一行的数据字典，初始包含静态信息
+        row_data = {
+            'name': name,
+            'cost_price': cost_price,
+            'shares': shares
+        }
+        row_data['code'] = stock_code  # 使用纯数字代码
+        
+        # 从并发结果中获取股票实时数据
+        stock_data = stock_data_map.get(stock_code, {})
+        current_price = stock_data.get('current_price')
+        dividend_per_share_from_api = stock_data.get('dividend_ttm')
+        dividend_yield_from_api = stock_data.get('dividend_yield_ttm')
+        
+        # 如果API没有返回价格，则使用成本价
+        if current_price is None:
+            current_price = cost_price
+            print(f"警告: {stock_code} 的实时价格获取失败，使用成本价: {current_price}")
+        else:
+            print(f"成功获取 {stock_code} 的价格: {current_price}, 股息(TTM): {dividend_per_share_from_api}, 股息率(TTM): {dividend_yield_from_api}")
+
+        row_data['current_price'] = current_price
+
+        # --- 核心计算逻辑 ---
+        # 总市值 = 实时价格 * 持仓股数
+        row_data['market_value'] = current_price * row_data['shares']
+        
+        # 盈亏 = (实时价格 - 成本价格) * 持仓股数
+        row_data['profit'] = (current_price - row_data['cost_price']) * row_data['shares']
+        
+        # 每股分红 (使用API获取的数据，如果没有则为0)
+        if dividend_per_share_from_api is not None:
+            row_data['dividend_per_share'] = dividend_per_share_from_api
+        else:
+            # 如果API没有返回股息数据，则设置为0
+            row_data['dividend_per_share'] = 0
+        
+        # 股息率 (优先使用API获取的数据，如果API没有则根据价格和每股分红计算)
+        if dividend_yield_from_api is not None:
+            row_data['dividend_yield'] = dividend_yield_from_api
+        else:
+            # 如果API没有返回股息率数据，则根据价格和每股分红计算
+            if current_price > 0:
+                row_data['dividend_yield'] = (row_data['dividend_per_share'] / current_price) * 100
+            else:
+                row_data['dividend_yield'] = 0
+            
+        # 每年分红金额 = 每股分红 * 持仓股数
+        row_data['annual_dividend_income'] = row_data['dividend_per_share'] * row_data['shares']
+
+        # --- 累加到总计 ---
+        total_summary["market_value"] += row_data['market_value']
+        total_summary["profit"] += row_data['profit']
+        total_summary["annual_dividend"] += row_data['annual_dividend_income']
+
+        calculated_rows.append(row_data)
+        
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 计算完成。")
+    return calculated_rows, total_summary
+
+def calculate_ema(prices, period):
+    """
+    计算指数移动平均线 (EMA)
+    prices: 价格列表 (pandas Series 或 list)
+    period: EMA周期
+    """
+    if len(prices) < period:
+        return None
+    
+    # 转换为pandas Series
+    if not isinstance(prices, pd.Series):
+        prices = pd.Series(prices)
+    
+    # 计算EMA
+    ema = prices.ewm(span=period, adjust=False).mean()
+    return ema.iloc[-1]
+
+def get_stock_kline_data(stock_code, period='daily', count=250):
+    """
+    获取股票K线数据（带缓存）
+    stock_code: 股票代码
+    period: 周期 ('daily'=日K, '2d'=2日, '3d'=3日)
+    count: 获取的数据条数
+    """
+    cache_key = f"{stock_code}_{period}"
+    current_time = datetime.now()
+    
+    # 检查缓存是否存在且未过期（缓存1小时）
+    if (cache_key in kline_cache and 
+        cache_key in cache_expire_time and 
+        current_time < cache_expire_time[cache_key]):
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 使用缓存数据: {stock_code} ({period})")
+        cached_data = kline_cache[cache_key]
+        # 返回缓存数据的副本
+        return cached_data.copy() if cached_data is not None else None
+    
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始获取 {stock_code} 的K线数据，周期: {period}")
+    try:
+        # 转换股票代码格式为腾讯API格式
+        if stock_code.startswith('sh'):
+            symbol = 'sh' + stock_code[2:]
+        elif stock_code.startswith('sz'):
+            symbol = 'sz' + stock_code[2:]
+        else:
+            # 如果没有前缀，根据代码判断市场
+            if stock_code.startswith('6'):  # 上交所
+                symbol = 'sh' + stock_code
+            elif stock_code.startswith('0') or stock_code.startswith('3'):  # 深交所
+                symbol = 'sz' + stock_code
+            else:
+                symbol = stock_code
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 转换后的腾讯API股票代码: {symbol}")
+        
+        # 使用腾讯API获取日K线数据
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 调用腾讯API获取 {symbol} 的历史数据...")
+        df = ak.stock_zh_a_hist_tx(symbol=symbol, start_date="20200101", end_date="20500101", adjust="qfq")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 腾讯API返回数据，形状: {df.shape if df is not None else 'None'}")
+        
+        if df is None or df.empty:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 获取 {stock_code} 腾讯K线数据为空")
+            return None
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 原始数据列名: {list(df.columns)}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 数据时间范围: {df['date'].min()} 到 {df['date'].max()}")
+        
+        # 根据周期重新采样数据
+        if period == '2d':
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 重新采样为2日K线...")
+            # 2日K线，重新采样
+            df['date'] = pd.to_datetime(df['date'])
+            df = df.set_index('date')
+            df_2d = df.resample('2B').agg({
+                'open': 'first',
+                'close': 'last',
+                'high': 'max',
+                'low': 'min',
+                'amount': 'sum'
+            }).dropna()
+            df = df_2d.reset_index()
+            df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 2日K线重采样完成，数据量: {len(df)}")
+        elif period == '3d':
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 重新采样为3日K线...")
+            # 3日K线，重新采样
+            df['date'] = pd.to_datetime(df['date'])
+            df = df.set_index('date')
+            df_3d = df.resample('3B').agg({
+                'open': 'first',
+                'close': 'last',
+                'high': 'max',
+                'low': 'min',
+                'amount': 'sum'
+            }).dropna()
+            df = df_3d.reset_index()
+            df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 3日K线重采样完成，数据量: {len(df)}")
+        # 默认日K线不需要重新采样
+        
+        # 转换列名以保持兼容性
+        if 'date' in df.columns and 'close' in df.columns:
+            df = df.rename(columns={'date': '日期', 'open': '开盘', 'close': '收盘', 'high': '最高', 'low': '最低'})
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 列名转换完成")
+        
+        if df is not None and not df.empty:
+            # 取最近count条数据
+            original_len = len(df)
+            if len(df) > count:
+                df = df.tail(count)
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] 数据截取: {original_len} -> {len(df)} 条")
+            
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {stock_code} K线数据获取成功，最终数据量: {len(df)}")
+            
+            # 存储到缓存
+            kline_cache[cache_key] = df.copy()
+            cache_expire_time[cache_key] = current_time + timedelta(hours=1)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 数据已缓存，过期时间: {cache_expire_time[cache_key].strftime('%H:%M:%S')}")
+            
+            return df
+        else:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] {stock_code} 处理后数据为空")
+            # 缓存空结果，避免重复请求
+            kline_cache[cache_key] = None
+            cache_expire_time[cache_key] = current_time + timedelta(minutes=30)  # 空结果缓存30分钟
+            return None
+            
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 获取 {stock_code} K线数据失败: {str(e)}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 错误类型: {type(e).__name__}")
+        import traceback
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 详细错误信息: {traceback.format_exc()}")
+        
+        # 缓存失败结果，避免短时间内重复请求
+        kline_cache[cache_key] = None
+        cache_expire_time[cache_key] = current_time + timedelta(minutes=15)  # 失败结果缓存15分钟
+        
+        return None
+
+def process_single_stock(stock):
+    """
+    处理单只股票的监控数据获取
+    返回股票监控结果或None（如果失败）
+    """
+    stock_code = stock['code']
+    stock_name = stock['name']
+    timeframe = stock['timeframe']
+    
+    try:
+        # 获取当前价格
+        _, current_price, _, _ = get_real_time_price(stock_code)
+        
+        if current_price is None:
+            print(f"无法获取 {stock_code} 的当前价格，跳过")
+            return None
+        
+        # 获取K线数据
+        kline_data = get_stock_kline_data(stock_code, timeframe)
+        
+        if kline_data is None or len(kline_data) < 188:
+            print(f"无法获取 {stock_code} 的足够K线数据，跳过")
+            return None
+        
+        # 计算EMA144和EMA188
+        closing_prices = kline_data['收盘']
+        ema144 = calculate_ema(closing_prices, 144)
+        ema188 = calculate_ema(closing_prices, 188)
+        
+        if ema144 is not None and ema188 is not None:
+            result = {
+                'code': stock_code,
+                'name': stock_name,
+                'current_price': current_price,
+                'ema144': ema144,
+                'ema188': ema188,
+                'timeframe': timeframe
+            }
+            print(f"成功获取 {stock_code} 监控数据: 当前价={current_price}, EMA144={ema144}, EMA188={ema188}")
+            return result
+        else:
+            print(f"无法计算 {stock_code} 的EMA值")
+            return None
+            
+    except Exception as e:
+        print(f"处理 {stock_code} 时出错: {str(e)}")
+        return None
+
+def get_monitor_data():
+    """
+    获取监控数据，包含EMA144和EMA188（并发版本）
+    返回股票列表，每只股票包含当前价格、EMA144、EMA188等信息
+    """
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始并发获取监控数据...")
+    
+    # 从数据库获取监控股票配置
+    from db import get_enabled_monitor_stocks
+    monitor_stocks_db = get_enabled_monitor_stocks()
+    
+    # 转换为需要的格式
+    monitor_stocks = []
+    for stock in monitor_stocks_db:
+        stock_dict = {
+            'code': stock[1],  # code
+            'name': stock[2],  # name
+            'timeframe': stock[3]  # timeframe
+        }
+        monitor_stocks.append(stock_dict)
+    
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 从数据库加载了 {len(monitor_stocks)} 只监控股票")
+    
+    results = []
+    
+    # 使用线程池并发处理，最多7个并发
+    with ThreadPoolExecutor(max_workers=5) as executor:  # 5个线程，避免过多并发
+        # 提交所有任务
+        future_to_stock = {executor.submit(process_single_stock, stock): stock for stock in monitor_stocks}
+        
+        # 收集结果
+        for future in concurrent.futures.as_completed(future_to_stock):
+            stock = future_to_stock[future]
+            try:
+                result = future.result()
+                if result is not None:
+                    results.append(result)
+            except Exception as e:
+                print(f"并发处理 {stock['code']} 时出现异常: {str(e)}")
+    
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 并发获取监控数据完成，成功获取 {len(results)} 只股票数据")
+    return results
+
+# 可以直接运行此文件进行测试
+if __name__ == '__main__':
+    rows, summary = get_portfolio_data()
+    import pprint
+    if rows:
+        print("--- 明细数据 (第一条) ---")
+        pprint.pprint(rows[0])
+    else:
+        print("无明细数据。")
+    print("\n--- 总计数据 ---")
+    pprint.pprint(summary)
+    
+    # 测试监控数据
+    print("\n--- 监控数据测试 ---")
+    monitor_data = get_monitor_data()
+    for stock in monitor_data:
+        pprint.pprint(stock)
+

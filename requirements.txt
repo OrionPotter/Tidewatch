@@ -1,0 +1,5 @@
+akshare>=1.10.0
+flask
+flask_cors
+pandas
+numpy

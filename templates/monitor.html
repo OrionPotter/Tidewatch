@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加仓区域监控</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; padding-top: 30px; }
+        .main-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .text-end { text-align: right !important; }
+        thead th {
+            background-color: #e9ecef;
+            font-weight: 600;
+        }
+        .in-zone {
+            background-color: #d4edda !important;
+            color: #155724;
+        }
+        .out-zone {
+            background-color: #f8d7da !important;
+            color: #721c24;
+        }
+        .badge-timeframe {
+            font-size: 0.75em;
+            padding: 0.25em 0.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">📊 加仓区域监控</h2>
+            <div class="d-flex align-items-center">
+                <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
+                <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
+                <small class="text-muted me-3" id="update-time"></small>
+                <button id="refresh-btn" class="btn btn-primary">
+                    🔄 刷新数据
+                </button>
+            </div>
+        </div>
+        
+        <div class="alert alert-info">
+            <strong>监控说明：</strong>当股票价格位于EMA144和EMA188之间时，表示可能进入加仓区域。
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th class="text-end">实时价格</th>
+                        <th class="text-end">EMA144</th>
+                        <th class="text-end">EMA188</th>
+                        <th class="text-center">时间维度</th>
+                        <th class="text-center">状态</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <tr><td colspan="6" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 工具函数：格式化数字为金额字符串
+        function formatMoney(num) {
+            if (num === undefined || num === null) return '-';
+            return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        
+        // 核心函数：从 API 获取数据并更新页面
+        async function loadData() {
+            const btn = document.getElementById('refresh-btn');
+            const tbody = document.getElementById('table-body');
+            const timeLabel = document.getElementById('update-time');
+            
+            // 设置按钮加载状态
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 加载中...';
+
+            try {
+                // 发起 API 请求
+                const response = await fetch('/api/monitor');
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // 清空现有的表格内容
+                    tbody.innerHTML = '';
+                    
+                    // 遍历监控数据，生成表格行
+                    data.stocks.forEach(stock => {
+                        const tr = document.createElement('tr');
+                        
+                        // 判断是否在加仓区域
+                        const inZone = stock.current_price >= Math.min(stock.ema144, stock.ema188) && 
+                                      stock.current_price <= Math.max(stock.ema144, stock.ema188);
+                        
+                        // 时间维度显示
+                        const timeframeMap = {
+                            '1d': '日K线',
+                            '2d': '2日K线',
+                            '3d': '3日K线'
+                        };
+                        
+                        const statusBadge = inZone ? 
+                            '<span class="badge bg-success">在加仓区域</span>' : 
+                            '<span class="badge bg-danger">不在加仓区域</span>';
+                        
+                        tr.className = inZone ? 'in-zone' : 'out-zone';
+                        
+                        tr.innerHTML = `
+                            <td><strong>${stock.name}</strong> <small class="text-muted">(${stock.code})</small></td>
+                            <td class="text-end font-monospace">${formatMoney(stock.current_price)}</td>
+                            <td class="text-end font-monospace">${formatMoney(stock.ema144)}</td>
+                            <td class="text-end font-monospace">${formatMoney(stock.ema188)}</td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary badge-timeframe">${timeframeMap[stock.timeframe] || stock.timeframe}</span>
+                            </td>
+                            <td class="text-center">${statusBadge}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    // 更新时间标签
+                    timeLabel.textContent = '最后更新: ' + data.timestamp;
+
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger p-4">数据加载失败</td></tr>';
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger p-4">网络请求错误，请检查连接。</td></tr>';
+            } finally {
+                // 恢复按钮状态
+                btn.disabled = false;
+                btn.innerHTML = '🔄 刷新数据';
+            }
+        }
+
+        // 页面加载完成后自动执行一次数据加载
+        document.addEventListener('DOMContentLoaded', loadData);
+        
+        // 绑定刷新按钮的点击事件
+        document.getElementById('refresh-btn').addEventListener('click', loadData);
+    </script>
+</body>
+</html>
