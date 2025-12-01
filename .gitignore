@@ -1,0 +1,84 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ---- Virtual Environment ----
+venv/
+env/
+ENV/
+.venv/
+
+# ---- Distribution / Packaging ----
+build/
+dist/
+develop-eggs/
+downloads/
+*.egg-info/
+.eggs/
+*.egg
+
+# ---- PyInstaller ----
+*.manifest
+*.spec
+
+# ---- Unit Tests / Coverage ----
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+nosetests.xml
+coverage.xml
+
+# ---- Jupyter Notebook ----
+.ipynb_checkpoints
+
+# ---- Django ----
+*.log
+local_settings.py
+db.sqlite3
+
+# ---- Flask ----
+instance/
+
+
+# ---- Scrapy ----
+.scrapy
+
+# ---- Sphinx Documentation ----
+docs/_build/
+
+# ---- PyBuilder ----
+target/
+
+# ---- Type Checking ----
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# ---- IDE / Editor ----
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# ---- System / OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Logs ----
+*.log
+
+# ---- Environment Variables ----
+.env
+.env.*
+# ---- Custom ----
+# 忽略你项目自定义的缓存或临时目录
+tmp/
+logs/
+output/

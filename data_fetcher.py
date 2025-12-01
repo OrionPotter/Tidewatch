@@ -8,6 +8,10 @@ import aiohttp
 from concurrent.futures import ThreadPoolExecutor
 import concurrent.futures
 import time
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 # 简单的内存缓存，用于存储K线数据
 kline_cache = {}
@@ -42,7 +46,12 @@ def get_real_time_price(stock_code, max_retries=3):
                 else:
                     symbol = stock_code  # 其他情况，直接使用
 
-            spot_data = ak.stock_individual_spot_xq(symbol=symbol)
+            token = os.getenv('AKSHARE_TOKEN')
+            if not token:
+                print("警告: 未设置AKSHARE_TOKEN环境变量，使用None")
+                token = None
+            
+            spot_data = ak.stock_individual_spot_xq(symbol=symbol, token=token, timeout=10)
             
             if spot_data is not None and not spot_data.empty:
                 # 查找现价字段
@@ -365,11 +374,32 @@ def process_single_stock(stock):
     处理单只股票的监控数据获取
     返回股票监控结果或None（如果失败）
     """
+    from db import get_cached_monitor_data, save_monitor_data
+    
     stock_code = stock['code']
     stock_name = stock['name']
     timeframe = stock['timeframe']
     
     try:
+        # 首先尝试从缓存获取数据（5分钟内的数据）
+        cached_data = get_cached_monitor_data(stock_code, timeframe, 5)
+        if cached_data:
+            current_price, ema144, ema188, created_at = cached_data
+            result = {
+                'code': stock_code,
+                'name': stock_name,
+                'current_price': current_price,
+                'ema144': ema144,
+                'ema188': ema188,
+                'timeframe': timeframe,
+                'cached': True
+            }
+            print(f"使用缓存数据 {stock_code}: 当前价={current_price}, EMA144={ema144}, EMA188={ema188}")
+            return result
+        
+        # 缓存中没有有效数据，重新获取
+        print(f"缓存中没有 {stock_code} 的有效数据，重新获取...")
+        
         # 获取当前价格
         _, current_price, _, _ = get_real_time_price(stock_code)
         
@@ -390,15 +420,19 @@ def process_single_stock(stock):
         ema188 = calculate_ema(closing_prices, 188)
         
         if ema144 is not None and ema188 is not None:
+            # 保存到缓存
+            save_monitor_data(stock_code, timeframe, current_price, ema144, ema188)
+            
             result = {
                 'code': stock_code,
                 'name': stock_name,
                 'current_price': current_price,
                 'ema144': ema144,
                 'ema188': ema188,
-                'timeframe': timeframe
+                'timeframe': timeframe,
+                'cached': False
             }
-            print(f"成功获取 {stock_code} 监控数据: 当前价={current_price}, EMA144={ema144}, EMA188={ema188}")
+            print(f"成功获取并缓存 {stock_code} 监控数据: 当前价={current_price}, EMA144={ema144}, EMA188={ema188}")
             return result
         else:
             print(f"无法计算 {stock_code} 的EMA值")
@@ -408,15 +442,38 @@ def process_single_stock(stock):
         print(f"处理 {stock_code} 时出错: {str(e)}")
         return None
 
+def get_eps_forecast_sync(stock_code):
+    """同步获取EPS预测数据（用于并发调用）"""
+    try:
+        # 移除市场前缀，只保留6位数字代码
+        code = stock_code
+        if code.startswith('sh'):
+            code = code[2:]
+        elif code.startswith('sz'):
+            code = code[2:]
+        
+        from fetch_eps_forecast_akshare import get_current_year_eps_forecast
+        eps_forecast = get_current_year_eps_forecast(code)
+        return eps_forecast
+    except Exception as e:
+        print(f"获取 {stock_code} EPS预测失败: {e}")
+        return None
+
 def get_monitor_data():
     """
-    获取监控数据，包含EMA144和EMA188（并发版本）
-    返回股票列表，每只股票包含当前价格、EMA144、EMA188等信息
+    获取监控数据，包含EMA144和EMA188（并发版本，支持缓存）
+    返回股票列表，每只股票包含当前价格、EMA144、EMA188、EPS预测等信息
     """
+    from db import get_enabled_monitor_stocks, clean_old_monitor_data
+    
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始并发获取监控数据...")
     
+    # 清理过期的缓存数据
+    deleted_count = clean_old_monitor_data()
+    if deleted_count > 0:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 清理了 {deleted_count} 条过期缓存数据")
+    
     # 从数据库获取监控股票配置
-    from db import get_enabled_monitor_stocks
     monitor_stocks_db = get_enabled_monitor_stocks()
     
     # 转换为需要的格式
@@ -432,6 +489,7 @@ def get_monitor_data():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 从数据库加载了 {len(monitor_stocks)} 只监控股票")
     
     results = []
+    cached_count = 0
     
     # 使用线程池并发处理，最多7个并发
     with ThreadPoolExecutor(max_workers=5) as executor:  # 5个线程，避免过多并发
@@ -444,11 +502,34 @@ def get_monitor_data():
             try:
                 result = future.result()
                 if result is not None:
+                    if result.get('cached'):
+                        cached_count += 1
                     results.append(result)
             except Exception as e:
                 print(f"并发处理 {stock['code']} 时出现异常: {str(e)}")
     
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 并发获取监控数据完成，成功获取 {len(results)} 只股票数据")
+    # 并发获取EPS预测数据
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始并发获取EPS预测数据...")
+    
+    # 使用线程池并发获取EPS预测
+    with ThreadPoolExecutor(max_workers=5) as eps_executor:  # 增加并发数
+        # 提交EPS预测任务
+        eps_future_to_result = {
+            eps_executor.submit(get_eps_forecast_sync, result['code']): result 
+            for result in results
+        }
+        
+        # 收集EPS预测结果
+        for eps_future in concurrent.futures.as_completed(eps_future_to_result):
+            result = eps_future_to_result[eps_future]
+            try:
+                eps_forecast = eps_future.result()
+                result['eps_forecast'] = eps_forecast
+            except Exception as e:
+                print(f"并发获取 {result['code']} EPS预测失败: {e}")
+                result['eps_forecast'] = None
+    
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 并发获取监控数据完成，成功获取 {len(results)} 只股票数据，其中 {cached_count} 只使用缓存")
     return results
 
 # 可以直接运行此文件进行测试

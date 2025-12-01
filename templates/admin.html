@@ -89,15 +89,15 @@
             <form id="monitor-form">
                 <input type="hidden" id="monitor-edit-id" value="">
                 <div class="row align-items-end">
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-2 mb-3">
                         <label for="monitor-code" class="form-label">股票代码</label>
                         <input type="text" class="form-control" id="monitor-code" placeholder="例如: sh600900, sz000895" required>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-2 mb-3">
                         <label for="monitor-name" class="form-label">股票名称</label>
                         <input type="text" class="form-control" id="monitor-name" required>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-2 mb-3">
                         <label for="monitor-timeframe" class="form-label">时间维度</label>
                         <select class="form-control" id="monitor-timeframe" required>
                             <option value="1d">日K线</option>
@@ -105,7 +105,11 @@
                             <option value="3d">3日K线</option>
                         </select>
                     </div>
-                    <div class="col-md-3 mb-3">
+                    <div class="col-md-2 mb-3">
+                        <label for="monitor-reasonable-pe" class="form-label">合理估值(PE)</label>
+                        <input type="number" class="form-control" id="monitor-reasonable-pe" step="0.1" value="15" required>
+                    </div>
+                    <div class="col-md-2 mb-3">
                         <button type="submit" class="btn btn-primary w-100">添加监控股票</button>
                     </div>
                 </div>
@@ -120,12 +124,13 @@
                         <th>股票代码</th>
                         <th>名称</th>
                         <th class="text-center">时间维度</th>
+                        <th class="text-end">合理估值(PE)</th>
                         <th class="text-center">状态</th>
                         <th class="text-end">操作</th>
                     </tr>
                 </thead>
                 <tbody id="monitor-table-body">
-                    <tr><td colspan="5" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
+                    <tr><td colspan="6" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -290,7 +295,7 @@
                 tbody.innerHTML = '';
                 
                 if (stocks.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">暂无监控股票数据</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-muted">暂无监控股票数据</td></tr>';
                     return;
                 }
                 
@@ -310,6 +315,7 @@
                         <td>${stock.code}</td>
                         <td>${stock.name}</td>
                         <td class="text-center">${timeframeMap[stock.timeframe] || stock.timeframe}</td>
+                        <td class="text-end">${stock.reasonable_pe || 15}</td>
                         <td class="text-center">${statusBadge}</td>
                         <td class="text-end">
                             <button class="btn btn-sm btn-outline-primary me-2" onclick="editMonitorStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">编辑</button>
@@ -321,7 +327,7 @@
                 });
             } catch (error) {
                 console.error("加载监控股票数据失败:", error);
-                document.getElementById('monitor-table-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">加载数据失败</td></tr>';
+                document.getElementById('monitor-table-body').innerHTML = '<tr><td colspan="6" class="text-center text-danger p-4">加载数据失败</td></tr>';
             }
         }
         
@@ -332,8 +338,9 @@
             const code = document.getElementById('monitor-code').value.trim();
             const name = document.getElementById('monitor-name').value.trim();
             const timeframe = document.getElementById('monitor-timeframe').value;
+            const reasonablePe = document.getElementById('monitor-reasonable-pe').value;
             
-            if (!code || !name || !timeframe) {
+            if (!code || !name || !timeframe || !reasonablePe) {
                 alert('请填写所有字段');
                 return;
             }
@@ -341,7 +348,8 @@
             const stockData = {
                 code: code,
                 name: name,
-                timeframe: timeframe
+                timeframe: timeframe,
+                reasonable_pe: parseFloat(reasonablePe)
             };
             
             let url, method;
@@ -387,6 +395,7 @@
             document.getElementById('monitor-code').value = stock.code;
             document.getElementById('monitor-name').value = stock.name;
             document.getElementById('monitor-timeframe').value = stock.timeframe;
+            document.getElementById('monitor-reasonable-pe').value = stock.reasonable_pe || 15;
             
             // 禁用代码字段编辑
             document.getElementById('monitor-code').disabled = true;

@@ -28,9 +28,24 @@ def init_db():
             code TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
             timeframe TEXT NOT NULL,
+            reasonable_pe REAL DEFAULT 15,
             enabled INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # 创建监控数据缓存表
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS monitor_data_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            timeframe TEXT NOT NULL,
+            current_price REAL NOT NULL,
+            ema144 REAL NOT NULL,
+            ema188 REAL NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(code, timeframe)
         )
     ''')
     
@@ -38,6 +53,9 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_portfolio_code ON portfolio(code)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_code ON monitor_stocks(code)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_enabled ON monitor_stocks(enabled)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_cache_code ON monitor_data_cache(code)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_cache_timeframe ON monitor_data_cache(timeframe)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_cache_created ON monitor_data_cache(created_at)')
     
     conn.commit()
     conn.close()
@@ -146,16 +164,16 @@ def get_monitor_stock_by_code(code):
     conn.close()
     return stock
 
-def add_monitor_stock(code, name, timeframe):
+def add_monitor_stock(code, name, timeframe, reasonable_pe=15):
     """添加监控股票"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
         cursor.execute('''
-            INSERT INTO monitor_stocks (code, name, timeframe)
-            VALUES (?, ?, ?)
-        ''', (code, name, timeframe))
+            INSERT INTO monitor_stocks (code, name, timeframe, reasonable_pe)
+            VALUES (?, ?, ?, ?)
+        ''', (code, name, timeframe, reasonable_pe))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -164,12 +182,24 @@ def add_monitor_stock(code, name, timeframe):
     finally:
         conn.close()
 
-def update_monitor_stock(code, name, timeframe, enabled=None):
+def update_monitor_stock(code, name, timeframe, reasonable_pe=None, enabled=None):
     """更新监控股票信息"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    if enabled is not None:
+    if enabled is not None and reasonable_pe is not None:
+        cursor.execute('''
+            UPDATE monitor_stocks
+            SET name = ?, timeframe = ?, reasonable_pe = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE code = ?
+        ''', (name, timeframe, reasonable_pe, enabled, code))
+    elif reasonable_pe is not None:
+        cursor.execute('''
+            UPDATE monitor_stocks
+            SET name = ?, timeframe = ?, reasonable_pe = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE code = ?
+        ''', (name, timeframe, reasonable_pe, code))
+    elif enabled is not None:
         cursor.execute('''
             UPDATE monitor_stocks
             SET name = ?, timeframe = ?, enabled = ?, updated_at = CURRENT_TIMESTAMP
@@ -217,6 +247,91 @@ def toggle_monitor_stock(code, enabled):
     
     return changed
 
+# ========== 监控数据缓存相关操作 ==========
+
+def save_monitor_data(code, timeframe, current_price, ema144, ema188):
+    """保存监控数据到缓存表"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            INSERT OR REPLACE INTO monitor_data_cache 
+            (code, timeframe, current_price, ema144, ema188, created_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (code, timeframe, current_price, ema144, ema188))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"保存监控数据失败: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_cached_monitor_data(code, timeframe, max_age_minutes=5):
+    """获取缓存的监控数据，如果数据太旧则返回None"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT current_price, ema144, ema188, created_at
+            FROM monitor_data_cache
+            WHERE code = ? AND timeframe = ?
+            AND datetime(created_at) > datetime('now', '-{} minutes')
+            ORDER BY created_at DESC
+            LIMIT 1
+        '''.format(max_age_minutes), (code, timeframe))
+        
+        result = cursor.fetchone()
+        return result
+    except Exception as e:
+        print(f"获取缓存监控数据失败: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_all_cached_monitor_data():
+    """获取所有有效的缓存监控数据"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT code, timeframe, current_price, ema144, ema188, created_at
+            FROM monitor_data_cache
+            WHERE datetime(created_at) > datetime('now', '-10 minutes')
+            ORDER BY code
+        ''')
+        
+        results = cursor.fetchall()
+        return results
+    except Exception as e:
+        print(f"获取所有缓存监控数据失败: {e}")
+        return []
+    finally:
+        conn.close()
+
+def clean_old_monitor_data():
+    """清理过期的监控数据缓存（保留最近1小时）"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            DELETE FROM monitor_data_cache
+            WHERE datetime(created_at) < datetime('now', '-1 hour')
+        ''')
+        
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return deleted_count
+    except Exception as e:
+        print(f"清理过期监控数据失败: {e}")
+        return 0
+    finally:
+        conn.close()
+
 def populate_initial_data():
     """从config.py导入初始数据（仅在数据库为空时）"""
     conn = sqlite3.connect(DB_PATH)
@@ -248,18 +363,18 @@ def populate_initial_data():
     if monitor_count == 0:
         # 导入默认监控股票数据
         default_monitor_stocks = [
-            ('sh601919', '中远海控', '1d'),
-            ('sz000895', '双汇发展', '1d'),
-            ('sh600938', '中国海油', '2d'),
-            ('sh600886', '国投电力', '3d'),
-            ('sh601169', '北京银行', '2d')
+            ('sh601919', '中远海控', '1d', 15),
+            ('sz000895', '双汇发展', '1d', 20),
+            ('sh600938', '中国海油', '2d', 12),
+            ('sh600886', '国投电力', '3d', 18),
+            ('sh601169', '北京银行', '2d', 8)
         ]
         
-        for code, name, timeframe in default_monitor_stocks:
+        for code, name, timeframe, reasonable_pe in default_monitor_stocks:
             cursor.execute('''
-                INSERT INTO monitor_stocks (code, name, timeframe)
-                VALUES (?, ?, ?)
-            ''', (code, name, timeframe))
+                INSERT INTO monitor_stocks (code, name, timeframe, reasonable_pe)
+                VALUES (?, ?, ?, ?)
+            ''', (code, name, timeframe, reasonable_pe))
         
         conn.commit()
         print(f"已导入 {len(default_monitor_stocks)} 条默认监控股票数据")
