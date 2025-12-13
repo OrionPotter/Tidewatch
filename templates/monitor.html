@@ -26,6 +26,9 @@
             background-color: #f8d7da !important;
             color: #721c24;
         }
+        .table-success {
+            background-color: #d4edda !important;
+        }
         .badge-timeframe {
             font-size: 0.75em;
             padding: 0.25em 0.5em;
@@ -61,12 +64,13 @@
                         <th class="text-end">EPS预测</th>
                         <th class="text-end">合理估值(PE)</th>
                         <th class="text-end">合理价格</th>
+                        <th class="text-center">估值状态</th>
                         <th class="text-center">时间维度</th>
                         <th class="text-center">状态</th>
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    <tr><td colspan="9" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
+                    <tr><td colspan="10" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -127,20 +131,24 @@
                         // 格式化合理价格显示，并判断当前价格是否合理
                         let reasonablePriceDisplay = '<span class="text-muted">-</span>';
                         let priceClass = '';
+                        
+                        // 判断估值状态
+                        let valuationStatus = '<span class="text-muted">-</span>';
+                        let valuationClass = '';
+                        
                         if (stock.reasonable_price) {
-                            if (stock.current_price < stock.reasonable_price * 0.8) {
+                            if (stock.current_price < stock.reasonable_price) {
                                 reasonablePriceDisplay = `<span class="text-primary">${formatMoney(stock.reasonable_price)}</span>`;
-                                priceClass = 'table-info'; // 价格偏低
-                            } else if (stock.current_price > stock.reasonable_price * 1.2) {
-                                reasonablePriceDisplay = `<span class="text-danger">${formatMoney(stock.reasonable_price)}</span>`;
-                                priceClass = 'table-warning'; // 价格偏高
+                                valuationStatus = '<span class="badge bg-success">低估</span>';
+                                valuationClass = 'table-success'; // 低估状态
                             } else {
-                                reasonablePriceDisplay = `<span class="text-success">${formatMoney(stock.reasonable_price)}</span>`;
-                                priceClass = 'table-success'; // 价格合理
+                                reasonablePriceDisplay = `<span class="text-muted">${formatMoney(stock.reasonable_price)}</span>`;
+                                valuationStatus = '<span class="badge bg-secondary">正常</span>';
+                                valuationClass = ''; // 正常状态
                             }
                         }
                         
-                        tr.className = inZone ? `in-zone ${priceClass}` : `out-zone ${priceClass}`;
+                        tr.className = inZone ? `in-zone ${valuationClass}` : `out-zone ${valuationClass}`;
                         
                         tr.innerHTML = `
                             <td><strong>${stock.name}</strong> <small class="text-muted">(${stock.code})</small></td>
@@ -150,6 +158,7 @@
                             <td class="text-end font-monospace">${epsDisplay}</td>
                             <td class="text-end font-monospace">${stock.reasonable_pe || 15}</td>
                             <td class="text-end font-monospace">${reasonablePriceDisplay}</td>
+                            <td class="text-center">${valuationStatus}</td>
                             <td class="text-center">
                                 <span class="badge bg-secondary badge-timeframe">${timeframeMap[stock.timeframe] || stock.timeframe}</span>
                             </td>
@@ -162,11 +171,11 @@
                     timeLabel.textContent = '最后更新: ' + data.timestamp;
 
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger p-4">数据加载失败</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger p-4">数据加载失败</td></tr>';
                 }
             } catch (error) {
                 console.error("Error:", error);
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger p-4">网络请求错误，请检查连接。</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger p-4">网络请求错误，请检查连接。</td></tr>';
             } finally {
                 // 恢复按钮状态
                 btn.disabled = false;
