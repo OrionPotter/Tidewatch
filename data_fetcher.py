@@ -250,24 +250,29 @@ def calculate_ema(prices, period):
 
 def get_stock_kline_data(stock_code, period='daily', count=250):
     """
-    获取股票K线数据（带缓存）
+    获取股票K线数据（优先从本地数据库读取）
     stock_code: 股票代码
     period: 周期 ('daily'=日K, '2d'=2日, '3d'=3日)
     count: 获取的数据条数
     """
+    from kline_manager import get_kline_data_with_cache
+    
+    # 优先从本地数据库读取
+    df = get_kline_data_with_cache(stock_code, period, count)
+    
+    if df is not None:
+        # 更新内存缓存
+        cache_key = f"{stock_code}_{period}"
+        current_time = datetime.now()
+        kline_cache[cache_key] = df.copy()
+        cache_expire_time[cache_key] = current_time + timedelta(hours=1)
+        return df
+    
+    # 如果本地数据库没有数据，回退到原来的API获取方式
     cache_key = f"{stock_code}_{period}"
     current_time = datetime.now()
     
-    # 检查缓存是否存在且未过期（缓存1小时）
-    if (cache_key in kline_cache and 
-        cache_key in cache_expire_time and 
-        current_time < cache_expire_time[cache_key]):
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 使用缓存数据: {stock_code} ({period})")
-        cached_data = kline_cache[cache_key]
-        # 返回缓存数据的副本
-        return cached_data.copy() if cached_data is not None else None
-    
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始获取 {stock_code} 的K线数据，周期: {period}")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 本地数据库无数据，使用API获取 {stock_code} 的K线数据")
     try:
         # 转换股票代码格式为腾讯API格式
         if stock_code.startswith('sh'):
@@ -283,24 +288,15 @@ def get_stock_kline_data(stock_code, period='daily', count=250):
             else:
                 symbol = stock_code
         
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 转换后的腾讯API股票代码: {symbol}")
-        
         # 使用腾讯API获取日K线数据
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 调用腾讯API获取 {symbol} 的历史数据...")
         df = ak.stock_zh_a_hist_tx(symbol=symbol, start_date="20200101", end_date="20500101", adjust="qfq")
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 腾讯API返回数据，形状: {df.shape if df is not None else 'None'}")
         
         if df is None or df.empty:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] 获取 {stock_code} 腾讯K线数据为空")
             return None
         
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 原始数据列名: {list(df.columns)}")
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 数据时间范围: {df['date'].min()} 到 {df['date'].max()}")
-        
         # 根据周期重新采样数据
         if period == '2d':
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 重新采样为2日K线...")
-            # 2日K线，重新采样
             df['date'] = pd.to_datetime(df['date'])
             df = df.set_index('date')
             df_2d = df.resample('2B').agg({
@@ -312,10 +308,7 @@ def get_stock_kline_data(stock_code, period='daily', count=250):
             }).dropna()
             df = df_2d.reset_index()
             df['date'] = df['date'].dt.strftime('%Y-%m-%d')
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 2日K线重采样完成，数据量: {len(df)}")
         elif period == '3d':
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 重新采样为3日K线...")
-            # 3日K线，重新采样
             df['date'] = pd.to_datetime(df['date'])
             df = df.set_index('date')
             df_3d = df.resample('3B').agg({
@@ -327,45 +320,37 @@ def get_stock_kline_data(stock_code, period='daily', count=250):
             }).dropna()
             df = df_3d.reset_index()
             df['date'] = df['date'].dt.strftime('%Y-%m-%d')
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 3日K线重采样完成，数据量: {len(df)}")
-        # 默认日K线不需要重新采样
         
         # 转换列名以保持兼容性
         if 'date' in df.columns and 'close' in df.columns:
             df = df.rename(columns={'date': '日期', 'open': '开盘', 'close': '收盘', 'high': '最高', 'low': '最低'})
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 列名转换完成")
         
         if df is not None and not df.empty:
             # 取最近count条数据
-            original_len = len(df)
             if len(df) > count:
                 df = df.tail(count)
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] 数据截取: {original_len} -> {len(df)} 条")
             
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] {stock_code} K线数据获取成功，最终数据量: {len(df)}")
+            # 保存到本地数据库
+            from kline_manager import update_stock_kline_data
+            update_stock_kline_data(stock_code, force_update=False)
             
             # 存储到缓存
             kline_cache[cache_key] = df.copy()
             cache_expire_time[cache_key] = current_time + timedelta(hours=1)
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 数据已缓存，过期时间: {cache_expire_time[cache_key].strftime('%H:%M:%S')}")
             
             return df
         else:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] {stock_code} 处理后数据为空")
             # 缓存空结果，避免重复请求
             kline_cache[cache_key] = None
-            cache_expire_time[cache_key] = current_time + timedelta(minutes=30)  # 空结果缓存30分钟
+            cache_expire_time[cache_key] = current_time + timedelta(minutes=30)
             return None
             
     except Exception as e:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] 获取 {stock_code} K线数据失败: {str(e)}")
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 错误类型: {type(e).__name__}")
-        import traceback
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 详细错误信息: {traceback.format_exc()}")
         
         # 缓存失败结果，避免短时间内重复请求
         kline_cache[cache_key] = None
-        cache_expire_time[cache_key] = current_time + timedelta(minutes=15)  # 失败结果缓存15分钟
+        cache_expire_time[cache_key] = current_time + timedelta(minutes=15)
         
         return None
 
@@ -385,10 +370,22 @@ def process_single_stock(stock):
         cached_data = get_cached_monitor_data(stock_code, timeframe, 5)
         if cached_data:
             # 检查缓存数据的长度，兼容新旧格式
-            if len(cached_data) >= 11:
+            if len(cached_data) >= 15:
                 # 新格式：包含趋势EMA数据
-                (current_price, ema144, ema188, ema5, ema10, ema20, 
-                 ema30, ema60, ema7, ema21, ema42, created_at) = cached_data
+                # 跳过前几个字段（id, code, timeframe），直接获取数据字段
+                current_price = cached_data[3]
+                ema144 = cached_data[4]
+                ema188 = cached_data[5]
+                ema5 = cached_data[6]
+                ema10 = cached_data[7]
+                ema20 = cached_data[8]
+                ema30 = cached_data[9]
+                ema60 = cached_data[10]
+                ema7 = cached_data[11]
+                ema21 = cached_data[12]
+                ema42 = cached_data[13]
+                created_at = cached_data[14]
+                
                 result = {
                     'code': stock_code,
                     'name': stock_name,
@@ -450,19 +447,22 @@ def process_single_stock(stock):
         
         if timeframe == '1d':
             # 日K线：计算EMA5、EMA10、EMA20
-            ema5 = calculate_ema(closing_prices, 5)
-            ema10 = calculate_ema(closing_prices, 10)
-            ema20 = calculate_ema(closing_prices, 20)
+            if len(closing_prices) >= 20:  # 确保有足够数据计算最大的EMA周期
+                ema5 = calculate_ema(closing_prices, 5)
+                ema10 = calculate_ema(closing_prices, 10)
+                ema20 = calculate_ema(closing_prices, 20)
         elif timeframe == '2d':
             # 2日K线：计算EMA10、EMA30、EMA60
-            ema10_2d = calculate_ema(closing_prices, 10)
-            ema30 = calculate_ema(closing_prices, 30)
-            ema60 = calculate_ema(closing_prices, 60)
+            if len(closing_prices) >= 60:  # 确保有足够数据计算最大的EMA周期
+                ema10_2d = calculate_ema(closing_prices, 10)
+                ema30 = calculate_ema(closing_prices, 30)
+                ema60 = calculate_ema(closing_prices, 60)
         elif timeframe == '3d':
             # 3日K线：计算EMA7、EMA21、EMA42
-            ema7 = calculate_ema(closing_prices, 7)
-            ema21 = calculate_ema(closing_prices, 21)
-            ema42 = calculate_ema(closing_prices, 42)
+            if len(closing_prices) >= 42:  # 确保有足够数据计算最大的EMA周期
+                ema7 = calculate_ema(closing_prices, 7)
+                ema21 = calculate_ema(closing_prices, 21)
+                ema42 = calculate_ema(closing_prices, 42)
         
         if ema144 is not None and ema188 is not None:
             # 保存到缓存（包含趋势所需的EMA数据）

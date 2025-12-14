@@ -38,17 +38,19 @@
 <body>
     <div class="container main-container">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">📊 加仓区域监控</h2>
-            <div class="d-flex align-items-center">
-                <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
-                <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
-                <small class="text-muted me-3" id="update-time"></small>
-                <button id="refresh-btn" class="btn btn-primary">
-                    🔄 刷新数据
-                </button>
-            </div>
-        </div>
-        
+                <h2 class="mb-0">📊 加仓区域监控</h2>
+                <div class="d-flex align-items-center">
+                    <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
+                    <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
+                    <small class="text-muted me-3" id="update-time"></small>
+                    <button id="update-kline-btn" class="btn btn-warning me-2" title="更新K线数据">
+                        📈 更新K线
+                    </button>
+                    <button id="refresh-btn" class="btn btn-primary">
+                        🔄 刷新数据
+                    </button>
+                </div>
+            </div>        
         <div class="alert alert-info">
             <strong>监控说明：</strong>当股票基本面处于低估,技术面加仓表示是一个比较合适的加仓机会。
         </div>
@@ -241,6 +243,41 @@
         
         // 绑定刷新按钮的点击事件
         document.getElementById('refresh-btn').addEventListener('click', loadData);
+        
+        // 绑定K线数据更新按钮的点击事件
+        document.getElementById('update-kline-btn').addEventListener('click', async function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            
+            // 禁用按钮并显示加载状态
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 更新中...';
+            
+            try {
+                const response = await fetch('/api/update-kline', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ force_update: false })
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    alert('K线数据更新任务已启动，请稍后刷新页面查看结果');
+                } else {
+                    alert('更新失败: ' + result.message);
+                }
+            } catch (error) {
+                console.error('更新K线数据失败:', error);
+                alert('更新失败，请检查网络连接');
+            } finally {
+                // 恢复按钮状态
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
     </script>
 </body>
 </html>

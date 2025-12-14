@@ -58,6 +58,24 @@ def init_db():
         )
     ''')
     
+    # 创建K线数据表（存储近三年的日K线数据）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS stock_kline_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            date TEXT NOT NULL,
+            open REAL NOT NULL,
+            close REAL NOT NULL,
+            high REAL NOT NULL,
+            low REAL NOT NULL,
+            volume INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(code, date)
+        )
+    ''')
+    
     # 创建索引以提高查询性能
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_portfolio_code ON portfolio(code)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_code ON monitor_stocks(code)')
@@ -65,6 +83,11 @@ def init_db():
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_cache_code ON monitor_data_cache(code)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_cache_timeframe ON monitor_data_cache(timeframe)')
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_monitor_cache_created ON monitor_data_cache(created_at)')
+    
+    # K线数据表索引
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_kline_code ON stock_kline_data(code)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_kline_code_date ON stock_kline_data(code, date)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_kline_date ON stock_kline_data(date)')
     
     conn.commit()
     conn.close()
@@ -343,6 +366,129 @@ def clean_old_monitor_data():
     except Exception as e:
         print(f"清理过期监控数据失败: {e}")
         return 0
+    finally:
+        conn.close()
+
+# ========== K线数据相关操作 ==========
+
+def save_kline_data(code, kline_data):
+    """保存K线数据到数据库（批量插入/更新）"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # 准备批量插入数据
+        insert_data = []
+        for _, row in kline_data.iterrows():
+            insert_data.append((
+                code,
+                row['日期'],
+                row['开盘'],
+                row['收盘'],
+                row['最高'],
+                row['最低'],
+                0,  # volume，腾讯API不提供
+                row['amount'] if 'amount' in row else 0
+            ))
+        
+        # 使用INSERT OR REPLACE进行批量插入
+        cursor.executemany('''
+            INSERT OR REPLACE INTO stock_kline_data 
+            (code, date, open, close, high, low, volume, amount, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', insert_data)
+        
+        conn.commit()
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 成功保存 {len(insert_data)} 条 {code} K线数据")
+        return True
+    except Exception as e:
+        print(f"保存K线数据失败: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_kline_data_from_db(code, start_date=None, end_date=None, limit=None):
+    """从数据库获取K线数据"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        query = '''
+            SELECT date, open, close, high, low, volume, amount
+            FROM stock_kline_data
+            WHERE code = ?
+        '''
+        params = [code]
+        
+        if start_date:
+            query += ' AND date >= ?'
+            params.append(start_date)
+        
+        if end_date:
+            query += ' AND date <= ?'
+            params.append(end_date)
+        
+        query += ' ORDER BY date DESC'
+        
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        if rows:
+            # 转换为DataFrame格式以保持兼容性
+            import pandas as pd
+            df = pd.DataFrame(rows, columns=['日期', '开盘', '收盘', '最高', '最低', 'volume', 'amount'])
+            return df
+        else:
+            return None
+            
+    except Exception as e:
+        print(f"从数据库获取K线数据失败: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_latest_kline_date(code):
+    """获取某只股票最新的K线数据日期"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT MAX(date) FROM stock_kline_data WHERE code = ?
+        ''', (code,))
+        result = cursor.fetchone()
+        return result[0] if result and result[0] else None
+    except Exception as e:
+        print(f"获取最新K线日期失败: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_stocks_need_update(days=1):
+    """获取需要更新K线数据的股票列表（超过指定天数未更新）"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute('''
+            SELECT DISTINCT code FROM monitor_stocks WHERE enabled = 1
+        ''')
+        monitor_stocks = [row[0] for row in cursor.fetchall()]
+        
+        stocks_need_update = []
+        for code in monitor_stocks:
+            latest_date = get_latest_kline_date(code)
+            if not latest_date or (datetime.now() - datetime.strptime(latest_date, '%Y-%m-%d')).days >= days:
+                stocks_need_update.append(code)
+        
+        return stocks_need_update
+    except Exception as e:
+        print(f"获取需要更新的股票列表失败: {e}")
+        return []
     finally:
         conn.close()
 

@@ -10,6 +10,38 @@ app = Flask(__name__)
 # 启用 CORS，解决开发时可能的跨域请求问题
 CORS(app)
 
+# ========== K线数据自动更新功能 ==========
+
+def auto_update_kline_data():
+    """
+    自动更新K线数据（应用启动时执行）
+    """
+    try:
+        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 开始检查K线数据更新...")
+        
+        # 导入K线管理模块
+        from kline_manager import batch_update_kline_data
+        
+        # 执行增量更新（只更新超过1天未更新的股票）
+        success = batch_update_kline_data(force_update=False, max_workers=2)  # 降低并发数避免影响启动速度
+        
+        if success:
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] K线数据自动更新完成")
+        else:
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] K线数据自动更新部分失败")
+            
+    except Exception as e:
+        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] K线数据自动更新异常: {str(e)}")
+
+# 在后台线程中执行K线数据更新
+import threading
+
+def start_kline_update_thread():
+    """启动K线数据更新线程"""
+    update_thread = threading.Thread(target=auto_update_kline_data, daemon=True)
+    update_thread.start()
+    print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] K线数据更新线程已启动")
+
 # 路由：首页
 # 当访问根路径 '/' 时，渲染 'index.html' 模板
 @app.route('/')
@@ -222,9 +254,43 @@ def api_monitor():
     }
     return jsonify(response_data)
 
+# 路由：手动更新K线数据API
+@app.route('/api/update-kline', methods=['POST'])
+def api_update_kline():
+    """手动更新K线数据的API接口"""
+    try:
+        data = request.get_json() or {}
+        force_update = data.get('force_update', False)
+        
+        from kline_manager import batch_update_kline_data
+        
+        # 在后台线程中执行更新，避免阻塞API响应
+        def update_in_background():
+            success = batch_update_kline_data(force_update=force_update, max_workers=3)
+            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 手动K线数据更新完成，成功: {success}")
+        
+        update_thread = threading.Thread(target=update_in_background, daemon=True)
+        update_thread.start()
+        
+        update_type = "强制更新" if force_update else "增量更新"
+        return jsonify({
+            'status': 'success', 
+            'message': f'已启动{update_type}任务，请在后台查看进度'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error', 
+            'message': f'启动更新失败: {str(e)}'
+        })
+
 if __name__ == '__main__':
     # 启动服务，debug=True 模式下修改代码会自动重启，方便开发
     # host='0.0.0.0' 使局域网内其他设备也能访问
     print("Flask 服务器正在启动...")
     print("请在浏览器中访问: http://localhost:5000")
+    
+    # 启动K线数据自动更新线程
+    start_kline_update_thread()
+    
     app.run(host='0.0.0.0', port=5000, debug=True)
