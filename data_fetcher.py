@@ -370,8 +370,8 @@ def process_single_stock(stock):
         cached_data = get_cached_monitor_data(stock_code, timeframe, 5)
         if cached_data:
             # 检查缓存数据的长度，兼容新旧格式
-            if len(cached_data) >= 15:
-                # 新格式：包含趋势EMA数据
+            if len(cached_data) >= 16:
+                # 新格式：包含趋势EMA数据和EPS数据
                 # 跳过前几个字段（id, code, timeframe），直接获取数据字段
                 current_price = cached_data[3]
                 ema144 = cached_data[4]
@@ -384,7 +384,8 @@ def process_single_stock(stock):
                 ema7 = cached_data[11]
                 ema21 = cached_data[12]
                 ema42 = cached_data[13]
-                created_at = cached_data[14]
+                eps_forecast = cached_data[14]
+                created_at = cached_data[15]
                 
                 result = {
                     'code': stock_code,
@@ -393,7 +394,8 @@ def process_single_stock(stock):
                     'ema144': ema144,
                     'ema188': ema188,
                     'timeframe': timeframe,
-                    'cached': True
+                    'cached': True,
+                    'eps_forecast': eps_forecast
                 }
                 
                 # 添加趋势判断所需的EMA数据
@@ -410,7 +412,7 @@ def process_single_stock(stock):
                     result['ema21'] = ema21
                     result['ema42'] = ema42
                 
-                print(f"使用缓存数据 {stock_code}: 当前价={current_price}, EMA144={ema144}, EMA188={ema188}")
+                print(f"使用缓存数据 {stock_code}: 当前价={current_price}, EMA144={ema144}, EMA188={ema188}, EPS={eps_forecast}")
                 return result
             else:
                 # 旧格式：只有基本EMA数据，需要重新获取
@@ -419,7 +421,6 @@ def process_single_stock(stock):
             print(f"缓存中没有 {stock_code} 的有效数据，重新获取...")
         
         # 缓存中没有有效数据，重新获取
-        print(f"缓存中没有 {stock_code} 的有效数据，重新获取...")
         
         # 获取当前价格
         _, current_price, _, _ = get_real_time_price(stock_code)
@@ -465,9 +466,39 @@ def process_single_stock(stock):
                 ema42 = calculate_ema(closing_prices, 42)
         
         if ema144 is not None and ema188 is not None:
-            # 保存到缓存（包含趋势所需的EMA数据）
-            save_monitor_data(stock_code, timeframe, current_price, ema144, ema188,
-                             ema5, ema10, ema20, ema30, ema60, ema7, ema21, ema42)
+            # 创建result对象
+            result = {
+                'code': stock_code,
+                'name': stock_name,
+                'current_price': current_price,
+                'ema144': ema144,
+                'ema188': ema188,
+                'timeframe': timeframe,
+                'cached': False
+            }
+            
+            # 添加趋势判断所需的EMA数据
+            if timeframe == '1d':
+                result['ema5'] = ema5
+                result['ema10'] = ema10
+                result['ema20'] = ema20
+            elif timeframe == '2d':
+                result['ema10'] = ema10_2d
+                result['ema30'] = ema30
+                result['ema60'] = ema60
+            elif timeframe == '3d':
+                result['ema7'] = ema7
+                result['ema21'] = ema21
+                result['ema42'] = ema42
+            
+            # 保存到缓存（包含趋势所需的EMA数据和EPS）
+            # 对于2日K线，需要使用ema10_2d而不是ema10
+            if timeframe == '2d':
+                save_monitor_data(stock_code, timeframe, current_price, ema144, ema188,
+                                 ema5, ema10_2d, ema20, ema30, ema60, ema7, ema21, ema42, result.get('eps_forecast'))
+            else:
+                save_monitor_data(stock_code, timeframe, current_price, ema144, ema188,
+                                 ema5, ema10, ema20, ema30, ema60, ema7, ema21, ema42, result.get('eps_forecast'))
             
             result = {
                 'code': stock_code,
@@ -569,26 +600,48 @@ def get_monitor_data():
             except Exception as e:
                 print(f"并发处理 {stock['code']} 时出现异常: {str(e)}")
     
-    # 并发获取EPS预测数据
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始并发获取EPS预测数据...")
+    # 检查哪些股票需要获取EPS数据（缓存中没有或为空的）
+    stocks_need_eps = []
+    for result in results:
+        # 如果是从缓存获取的数据且EPS为None，则需要获取EPS
+        if result.get('cached') and result.get('eps_forecast') is None:
+            stocks_need_eps.append(result)
+        # 如果不是从缓存获取的数据，EPS已经在process_single_stock中处理了
+        elif not result.get('cached'):
+            continue
     
-    # 使用线程池并发获取EPS预测
-    with ThreadPoolExecutor(max_workers=5) as eps_executor:  # 增加并发数
-        # 提交EPS预测任务
-        eps_future_to_result = {
-            eps_executor.submit(get_eps_forecast_sync, result['code']): result 
-            for result in results
-        }
+    # 只对需要EPS数据的股票进行并发获取
+    if stocks_need_eps:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始并发获取 {len(stocks_need_eps)} 只股票的EPS预测数据...")
         
-        # 收集EPS预测结果
-        for eps_future in concurrent.futures.as_completed(eps_future_to_result):
-            result = eps_future_to_result[eps_future]
-            try:
-                eps_forecast = eps_future.result()
-                result['eps_forecast'] = eps_forecast
-            except Exception as e:
-                print(f"并发获取 {result['code']} EPS预测失败: {e}")
-                result['eps_forecast'] = None
+        # 使用线程池并发获取EPS预测
+        with ThreadPoolExecutor(max_workers=5) as eps_executor:
+            # 提交EPS预测任务
+            eps_future_to_result = {
+                eps_executor.submit(get_eps_forecast_sync, result['code']): result 
+                for result in stocks_need_eps
+            }
+            
+            # 收集EPS预测结果
+            for eps_future in concurrent.futures.as_completed(eps_future_to_result):
+                result = eps_future_to_result[eps_future]
+                try:
+                    eps_forecast = eps_future.result()
+                    result['eps_forecast'] = eps_forecast
+                    
+                    # 更新缓存中的EPS数据
+                    from db import save_monitor_data
+                    save_monitor_data(
+                        result['code'], result['timeframe'], result['current_price'],
+                        result['ema144'], result['ema188'],
+                        result.get('ema5'), result.get('ema10'), result.get('ema20'),
+                        result.get('ema30'), result.get('ema60'), result.get('ema7'),
+                        result.get('ema21'), result.get('ema42'), eps_forecast
+                    )
+                    
+                except Exception as e:
+                    print(f"并发获取 {result['code']} EPS预测失败: {e}")
+                    result['eps_forecast'] = None
     
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 并发获取监控数据完成，成功获取 {len(results)} 只股票数据，其中 {cached_count} 只使用缓存")
     return results

@@ -53,6 +53,7 @@ def init_db():
             ema7 REAL,
             ema21 REAL,
             ema42 REAL,
+            eps_forecast REAL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(code, timeframe)
         )
@@ -283,7 +284,7 @@ def toggle_monitor_stock(code, enabled):
 
 def save_monitor_data(code, timeframe, current_price, ema144, ema188, 
                      ema5=None, ema10=None, ema20=None, ema30=None, ema60=None,
-                     ema7=None, ema21=None, ema42=None):
+                     ema7=None, ema21=None, ema42=None, eps_forecast=None):
     """保存监控数据到缓存表"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -292,10 +293,10 @@ def save_monitor_data(code, timeframe, current_price, ema144, ema188,
         cursor.execute('''
             INSERT OR REPLACE INTO monitor_data_cache 
             (code, timeframe, current_price, ema144, ema188, ema5, ema10, ema20, 
-             ema30, ema60, ema7, ema21, ema42, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ''', (code, timeframe, current_price, ema144, ema188, ema5, ema10, ema20,
-              ema30, ema60, ema7, ema21, ema42))
+             ema30, ema60, ema7, ema21, ema42, eps_forecast, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ''', (code, timeframe, current_price, ema144, ema188, ema5, ema10, ema20, 
+              ema30, ema60, ema7, ema21, ema42, eps_forecast))
         conn.commit()
         return True
     except Exception as e:
@@ -310,9 +311,10 @@ def get_cached_monitor_data(code, timeframe, max_age_minutes=5):
     cursor = conn.cursor()
     
     try:
+        # 修复SQL查询，使用参数化查询而不是字符串格式化
         cursor.execute('''
-            SELECT current_price, ema144, ema188, ema5, ema10, ema20, 
-                   ema30, ema60, ema7, ema21, ema42, created_at
+            SELECT id, code, timeframe, current_price, ema144, ema188, 
+                   ema5, ema10, ema20, ema30, ema60, ema7, ema21, ema42, eps_forecast, created_at
             FROM monitor_data_cache
             WHERE code = ? AND timeframe = ?
             AND datetime(created_at) > datetime('now', '-{} minutes')
