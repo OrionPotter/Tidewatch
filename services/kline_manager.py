@@ -5,10 +5,15 @@ from datetime import datetime, timedelta
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from models.db import KlineRepository, MonitorStockRepository
+from utils.logger import get_logger
+
 
 os.environ.pop('http_proxy', None)
 os.environ.pop('https_proxy', None)
 os.environ.pop('all_proxy', None)
+
+# 获取日志实例
+logger = get_logger('kline_manager')
 
 
 class KlineService:
@@ -26,7 +31,7 @@ class KlineService:
             else:
                 symbol = 'sh' + code if code.startswith('6') else 'sz' + code
             
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 更新 {code} 的K线数据...")
+            logger.info(f"更新 {code} 的K线数据...")
             
             # 确定数据范围
             if force_update:

@@ -78,17 +78,26 @@ def update_monitor_stock(code):
         code, data['name'], data['timeframe'],
         float(data.get('reasonable_pe_min', 15)), float(data.get('reasonable_pe_max', 20))
     )
-    return jsonify({'status': 'success' if success else 'error'})
+    return jsonify({
+        'status': 'success' if success else 'error', 
+        'message': '更新成功' if success else '更新失败'
+    })
 
 @admin_routes.route('/monitor-stocks/<code>', methods=['DELETE'])
 def delete_monitor_stock(code):
     """删除监控股票"""
     success = MonitorStockRepository.delete(code)
-    return jsonify({'status': 'success' if success else 'error'})
+    return jsonify({
+        'status': 'success' if success else 'error',
+        'message': '删除成功' if success else '删除失败'
+    })
 
 @admin_routes.route('/monitor-stocks/<code>/toggle', methods=['POST'])
 def toggle_monitor_stock(code):
     """启用/禁用监控股票"""
     data = request.get_json()
     success = MonitorStockRepository.toggle_enabled(code, data.get('enabled', True))
-    return jsonify({'status': 'success' if success else 'error'})
+    return jsonify({
+        'status': 'success' if success else 'error',
+        'message': '操作成功' if success else '操作失败'
+    })

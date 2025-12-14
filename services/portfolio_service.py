@@ -5,6 +5,10 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import akshare as ak
 from models.db import StockRepository
+from utils.logger import get_logger
+
+# 获取日志实例
+logger = get_logger('portfolio')
 
 # 清除代理设置
 os.environ. pop('http_proxy', None)
@@ -60,14 +64,14 @@ class PortfolioService:
                         dividend_yield_ttm = float(yield_row['value'].iloc[0])
                     
                     if current_price: 
-                        print(f"成功获取 {stock_code} 的价格: {current_price}")
+                        logger.info(f"成功获取 {stock_code} 的价格: {current_price}")
                         return stock_code, current_price, dividend_ttm, dividend_yield_ttm
             
             except Exception as e: 
                 if i < max_retries - 1:
                     time.sleep(2)
                 else:
-                    print(f"获取 {stock_code} 实时价格失败: {str(e)[:100]}")
+                    logger.error(f"获取 {stock_code} 实时价格失败: {str(e)[:100]}")
         
         return stock_code, None, None, None
     

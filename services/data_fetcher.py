@@ -8,6 +8,7 @@ import concurrent.futures
 import time
 from dotenv import load_dotenv
 from models.db import MonitorDataCacheRepository
+from utils.logger import get_logger
 
 load_dotenv()
 
@@ -15,6 +16,9 @@ load_dotenv()
 os.environ.pop('http_proxy', None)
 os.environ.pop('https_proxy', None)
 os.environ.pop('all_proxy', None)
+
+# 获取日志实例
+logger = get_logger('data_fetcher')
 
 
 class DataFetcher:
@@ -53,12 +57,12 @@ class DataFetcher:
             else: 
                 symbol = 'sh' + stock_code if stock_code.startswith('6') else 'sz' + stock_code
             
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 使用API获取 {stock_code} 的K线数据")
+            logger.info(f"使用API获取 {stock_code} 的K线数据")
             
             df = ak.stock_zh_a_hist_tx(symbol=symbol, start_date="20200101", end_date="20500101", adjust="qfq")
             
             if df is None or df.empty:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] 获取 {stock_code} K线数据为空")
+                logger.warning(f"获取 {stock_code} K线数据为空")
                 return None
             
             # 重采样处理
@@ -89,7 +93,7 @@ class DataFetcher:
             return df
         
         except Exception as e:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] 获取 {stock_code} K线数据失败: {str(e)}")
+            logger.error(f"获取 {stock_code} K线数据失败: {str(e)}")
             return None
     
     @staticmethod
@@ -106,7 +110,7 @@ class DataFetcher:
             eps = get_current_year_eps_forecast(code)
             return eps
         except Exception as e: 
-            print(f"获取 {stock_code} EPS预测失败: {e}")
+            logger.error(f"获取 {stock_code} EPS预测失败: {e}")
             return None
     
     @staticmethod
@@ -146,14 +150,14 @@ class DataFetcher:
             _, current_price, _, _ = PortfolioService.get_real_time_price(stock_code)
             
             if current_price is None:
-                print(f"无法获取 {stock_code} 的当前价格")
+                logger.warning(f"无法获取 {stock_code} 的当前价格")
                 return None
             
             # 获取K线数据
             kline_data = DataFetcher.get_stock_kline_data(stock_code, timeframe)
             
             if kline_data is None or len(kline_data) < 188:
-                print(f"无法获取 {stock_code} 的足够K线数据")
+                logger.warning(f"无法获取 {stock_code} 的足够K线数据")
                 return None
             
             # 计算EMA
@@ -162,7 +166,7 @@ class DataFetcher:
             ema188 = DataFetcher.calculate_ema(closing_prices, 188)
             
             if ema144 is None or ema188 is None:
-                print(f"无法计算 {stock_code} 的EMA值")
+                logger.warning(f"无法计算 {stock_code} 的EMA值")
                 return None
             
             # 根据时间维度计算趋势EMA
@@ -222,7 +226,7 @@ class DataFetcher:
             return result
         
         except Exception as e: 
-            print(f"处理 {stock_code} 时出错: {str(e)}")
+            logger.error(f"处理 {stock_code} 时出错: {str(e)}")
             return None
     
     @staticmethod
@@ -230,12 +234,12 @@ class DataFetcher:
         """获取监控数据"""
         from models.db import MonitorStockRepository, KlineRepository
         
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 开始获取监控数据...")
+        logger.info("开始获取监控数据...")
         
         # 清理过期缓存
         deleted = MonitorDataCacheRepository.clean_old_data(1)
         if deleted > 0:
-            print(f"清理了 {deleted} 条过期缓存")
+            logger.info(f"清理了 {deleted} 条过期缓存")
         
         # 获取启用的监控股票
         monitor_stocks_db = MonitorStockRepository.get_enabled()
@@ -245,7 +249,7 @@ class DataFetcher:
             for s in monitor_stocks_db
         ]
         
-        print(f"从数据库加载了 {len(monitor_stocks)} 只监控股票")
+        logger.info(f"从数据库加载了 {len(monitor_stocks)} 只监控股票")
         
         results = []
         
@@ -265,13 +269,13 @@ class DataFetcher:
                     if result:
                         results.append(result)
                 except Exception as e:
-                    print(f"并发处理异常: {e}")
+                    logger.error(f"并发处理异常: {e}")
         
         # 获取EPS数据
         stocks_need_eps = [r for r in results if r.get('eps_forecast') is None]
         
         if stocks_need_eps:
-            print(f"开始获取 {len(stocks_need_eps)} 只股票的EPS预测...")
+            logger.info(f"开始获取 {len(stocks_need_eps)} 只股票的EPS预测...")
             
             with ThreadPoolExecutor(max_workers=5) as executor:
                 eps_futures = {
@@ -285,8 +289,8 @@ class DataFetcher:
                         eps = future.result()
                         result['eps_forecast'] = eps
                     except Exception as e: 
-                        print(f"获取 {result['code']} EPS失败: {e}")
+                        logger.error(f"获取 {result['code']} EPS失败: {e}")
                         result['eps_forecast'] = None
         
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] 获取监控数据完成，共 {len(results)} 只股票")
+        logger.info(f"获取监控数据完成，共 {len(results)} 只股票")
         return results

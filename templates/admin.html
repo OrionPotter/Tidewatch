@@ -368,12 +368,12 @@
             let url, method;
             if (editingMonitorStock) {
                 // 更新现有监控股票
-                url = `/api/monitor-stocks/${editingMonitorStock.code}`;
+                url = `/api/admin/monitor-stocks/${editingMonitorStock.code}`;
                 method = 'PUT';
                 stockData.enabled = editingMonitorStock.enabled;
             } else {
                 // 添加新监控股票
-                url = '/api/monitor-stocks';
+                url = '/api/admin/monitor-stocks';
                 method = 'POST';
             }
             

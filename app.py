@@ -5,8 +5,12 @@ import threading
 from flask import Flask, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
+from utils.logger import get_logger
 
 load_dotenv()
+
+# 获取日志实例
+logger = get_logger('app')
 
 def create_app():
     """应用工厂"""
@@ -41,7 +45,7 @@ def create_app():
 def start_background_tasks(app):
     """启动后台任务"""
     if os.getenv('AUTO_UPDATE_KLINE', 'true').lower() != 'true':
-        print("⚠️ 已禁用自动K线更新")
+        logger.warning("已禁用自动K线更新")
         return
     
     from services.kline_manager import KlineService
@@ -52,19 +56,19 @@ def start_background_tasks(app):
     
     t = threading.Thread(target=auto_update, daemon=True)
     t.start()
-    print("🧵 K线更新后台线程已启动")
+    logger.info("K线更新后台线程已启动")
 
 
 if __name__ == '__main__':
     # 初始化数据库
-    from models.db import init_db, populate_initial_data
-    init_db()
-    populate_initial_data()
+    # from models.db import init_db, populate_initial_data
+    # init_db()
+    # populate_initial_data()
     
     app = create_app()
     
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         start_background_tasks(app)
     
-    print("🚀 Flask 启动中：http://localhost:5000")
+    logger.info("Flask 启动中：http://localhost:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)

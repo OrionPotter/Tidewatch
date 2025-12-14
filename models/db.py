@@ -4,6 +4,10 @@ from contextlib import contextmanager
 from datetime import datetime
 import os
 import pandas as pd
+from utils.logger import get_logger
+
+# 获取日志实例
+logger = get_logger('db')
 
 DB_PATH = 'portfolio.db'
 
@@ -267,7 +271,7 @@ class MonitorDataCacheRepository:
                 conn.commit()
                 return True
             except Exception as e:
-                print(f"保存监控缓存失败: {e}")
+                logger.error(f"保存监控缓存失败: {e}")
                 return False
     
     @staticmethod
@@ -299,7 +303,7 @@ class MonitorDataCacheRepository:
                         if age_minutes > max_age_minutes:
                             return None
                     except Exception as e:
-                        print(f"解析缓存时间失败: {e}")
+                        logger.error(f"解析缓存时间失败: {e}")
                         return None
             
             return result
@@ -401,9 +405,9 @@ def populate_initial_data():
                         (code, info['name'], info['cost_price'], info['shares'])
                     )
                 conn.commit()
-                print(f"已从config.py导入 {len(PORTFOLIO_CONFIG)} 条初始数据")
+                logger.info(f"已从config.py导入 {len(PORTFOLIO_CONFIG)} 条初始数据")
             except ImportError: 
-                print("未找到config.py文件")
+                logger.warning("未找到config.py文件")
         
         # 检查monitor_stocks表是否为空
         cursor.execute('SELECT COUNT(*) FROM monitor_stocks')
@@ -418,9 +422,9 @@ def populate_initial_data():
                         (code, name, timeframe, pe_min, pe_max)
                     )
                 conn.commit()
-                print(f"已从config.py导入 {len(MONITOR_STOCKS_CONFIG)} 条监控股票数据")
+                logger.info(f"已从config.py导入 {len(MONITOR_STOCKS_CONFIG)} 条监控股票数据")
             except ImportError: 
-                print("未找到config.py文件，使用默认数据")
+                logger.warning("未找到config.py文件，使用默认数据")
                 default = [
                     ('sh601919', '中远海控', '1d', 15, 20),
                     ('sz000895', '双汇发展', '1d', 18, 25),

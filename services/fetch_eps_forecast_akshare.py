@@ -1,5 +1,9 @@
 import akshare as ak
 from datetime import datetime
+from utils.logger import get_logger
+
+# 获取日志实例
+logger = get_logger('fetch_eps')
 
 def get_current_year_eps_forecast(stock_code):
     """获取当前年度每股收益预测均值"""
@@ -18,7 +22,7 @@ def get_current_year_eps_forecast(stock_code):
         return None
         
     except Exception as e:
-        print(f"获取 {stock_code} 数据失败: {e}")
+        logger.error(f"获取 {stock_code} 数据失败: {e}")
         return None
 
 def main():
@@ -28,9 +32,9 @@ def main():
     eps_forecast = get_current_year_eps_forecast(stock_code)
     
     if eps_forecast:
-        print(f"{stock_code} 当前年度每股收益预测均值: {eps_forecast}元")
+        logger.info(f"{stock_code} 当前年度每股收益预测均值: {eps_forecast}元")
     else:
-        print(f"{stock_code} 获取预测数据失败")
+        logger.warning(f"{stock_code} 获取预测数据失败")
 
 if __name__ == '__main__':
     main()
