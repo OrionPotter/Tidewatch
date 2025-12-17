@@ -253,17 +253,17 @@ class DataFetcher:
         
         results = []
         
-        # 并发处理
+        # 并发处理，保持原始顺序
         with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_stock = {
+            futures = [
                 executor.submit(
                     DataFetcher.process_monitor_stock,
                     stock,
                     MonitorStockRepository.get_by_code(stock['code'])
-                ): stock for stock in monitor_stocks
-            }
+                ) for stock in monitor_stocks
+            ]
             
-            for future in concurrent.futures.as_completed(future_to_stock):
+            for future in futures:
                 try: 
                     result = future.result()
                     if result:
