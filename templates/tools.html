@@ -110,6 +110,50 @@
                 </div>
             </div>
         </div>
+
+        <div class="tool-card">
+            <h4 class="mb-3">📤 K线数据导出</h4>
+            <p class="text-muted">导出股票的日K线数据，支持CSV和Excel格式</p>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">选择股票 <span class="text-danger">*</span></label>
+                    <select id="export-stock-select" class="form-select">
+                        <option value="">-- 请选择 --</option>
+                    </select>
+                    <div class="form-text" id="stock-info"></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">导出格式</label>
+                    <select id="export-format" class="form-select">
+                        <option value="csv">CSV</option>
+                        <option value="excel">Excel</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">开始日期（可选）</label>
+                    <input type="date" id="export-start-date" class="form-control">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">结束日期（可选）</label>
+                    <input type="date" id="export-end-date" class="form-control">
+                </div>
+            </div>
+
+            <div class="mt-3">
+                <button class="btn btn-success" onclick="exportKline()" id="export-btn">
+                    📥 导出数据
+                </button>
+                <button class="btn btn-outline-secondary ms-2" onclick="resetExport()">
+                    🔄 重置
+                </button>
+            </div>
+
+            <div id="export-result" class="mt-3" style="display: none;"></div>
+        </div>
     </div>
 
     <script>
@@ -286,6 +330,122 @@
         }
 
         document.addEventListener('DOMContentLoaded', loadPortfolioStocks);
+
+        // K线导出相关功能
+        let exportStocks = [];
+
+        async function loadExportStocks() {
+            try {
+                const response = await fetch('/api/tools/export-kline/stocks');
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    exportStocks = data.data;
+                    const select = document.getElementById('export-stock-select');
+                    
+                    data.data.forEach(stock => {
+                        const option = document.createElement('option');
+                        option.value = stock.code;
+                        option.textContent = `${stock.name} (${stock.code})`;
+                        option.dataset.latestDate = stock.latest_date || '无数据';
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('加载股票列表失败:', error);
+            }
+        }
+
+        document.getElementById('export-stock-select').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const infoDiv = document.getElementById('stock-info');
+            
+            if (this.value) {
+                const latestDate = selectedOption.dataset.latestDate;
+                infoDiv.textContent = `最新数据日期: ${latestDate}`;
+                infoDiv.className = 'form-text text-info';
+            } else {
+                infoDiv.textContent = '';
+            }
+        });
+
+        async function exportKline() {
+            const code = document.getElementById('export-stock-select').value;
+            const format = document.getElementById('export-format').value;
+            const startDate = document.getElementById('export-start-date').value;
+            const endDate = document.getElementById('export-end-date').value;
+            const btn = document.getElementById('export-btn');
+            const resultDiv = document.getElementById('export-result');
+
+            if (!code) {
+                alert('请选择要导出的股票');
+                return;
+            }
+
+            // 验证日期范围
+            if (startDate && endDate && startDate > endDate) {
+                alert('开始日期不能晚于结束日期');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 导出中...';
+            resultDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/tools/export-kline', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        format: format,
+                        start_date: startDate || null,
+                        end_date: endDate || null
+                    })
+                });
+
+                if (response.ok) {
+                    // 下载文件
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || `kline_data.${format === 'csv' ? 'csv' : 'xlsx'}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+
+                    resultDiv.innerHTML = '<div class="alert alert-success">✅ 导出成功！</div>';
+                    resultDiv.style.display = 'block';
+                } else {
+                    const error = await response.json();
+                    resultDiv.innerHTML = `<div class="alert alert-danger">❌ 导出失败: ${error.message || '未知错误'}</div>`;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('导出失败:', error);
+                resultDiv.innerHTML = '<div class="alert alert-danger">❌ 导出失败: 网络错误</div>';
+                resultDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '📥 导出数据';
+            }
+        }
+
+        function resetExport() {
+            document.getElementById('export-stock-select').value = '';
+            document.getElementById('export-format').value = 'csv';
+            document.getElementById('export-start-date').value = '';
+            document.getElementById('export-end-date').value = '';
+            document.getElementById('stock-info').textContent = '';
+            document.getElementById('export-result').style.display = 'none';
+        }
+
+        // 加载导出股票列表
+        loadExportStocks();
     </script>
 </body>
 </html>

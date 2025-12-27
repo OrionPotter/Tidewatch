@@ -430,6 +430,62 @@ class KlineRepository:
                    ORDER BY update_date DESC LIMIT 1'''
             )
             return cursor.fetchone()
+    
+    @staticmethod
+    def export_kline_data(code, start_date=None, end_date=None):
+        """获取K线数据用于导出
+        
+        Args:
+            code: 股票代码
+            start_date: 开始日期 (格式: YYYY-MM-DD)，None表示不限制
+            end_date: 结束日期 (格式: YYYY-MM-DD)，None表示不限制
+        
+        Returns:
+            DataFrame: 包含K线数据的DataFrame，列名包括：日期、开盘、收盘、最高、最低、成交量、成交额
+        """
+        with get_db_conn() as conn:
+            cursor = conn.cursor()
+            
+            # 构建查询条件
+            if start_date and end_date:
+                cursor.execute(
+                    '''SELECT date, open, close, high, low, volume, amount
+                       FROM stock_kline_data
+                       WHERE code = ? AND date >= ? AND date <= ?
+                       ORDER BY date ASC''',
+                    (code, start_date, end_date)
+                )
+            elif start_date:
+                cursor.execute(
+                    '''SELECT date, open, close, high, low, volume, amount
+                       FROM stock_kline_data
+                       WHERE code = ? AND date >= ?
+                       ORDER BY date ASC''',
+                    (code, start_date)
+                )
+            elif end_date:
+                cursor.execute(
+                    '''SELECT date, open, close, high, low, volume, amount
+                       FROM stock_kline_data
+                       WHERE code = ? AND date <= ?
+                       ORDER BY date ASC''',
+                    (code, end_date)
+                )
+            else:
+                cursor.execute(
+                    '''SELECT date, open, close, high, low, volume, amount
+                       FROM stock_kline_data
+                       WHERE code = ?
+                       ORDER BY date ASC''',
+                    (code,)
+                )
+            
+            rows = cursor.fetchall()
+            
+            if rows:
+                df = pd.DataFrame(rows, columns=['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额'])
+                return df
+            return None
 
 
 def populate_initial_data():
