@@ -209,11 +209,11 @@
             let url, method;
             if (editingStock) {
                 // 更新现有股票
-                url = `/api/stocks/${editingStock.code}`;
+                url = `/api/admin/stocks/${editingStock.code}`;
                 method = 'PUT';
             } else {
                 // 添加新股票
-                url = '/api/stocks';
+                url = '/api/admin/stocks';
                 method = 'POST';
             }
             
