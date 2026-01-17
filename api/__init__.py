@@ -1,6 +1,8 @@
 # api/__init__.py
-from .portfolio_routes import portfolio_routes
-from .monitor_routes import monitor_routes
-from .admin_routes import admin_routes
+from .portfolio_routes import portfolio_router
+from .monitor_routes import monitor_router
+from .admin_routes import admin_router
+from .tools_routes import tools_router
+from .xueqiu_routes import xueqiu_router
 
-__all__ = ['portfolio_routes', 'monitor_routes', 'admin_routes']
+__all__ = ['portfolio_router', 'monitor_router', 'admin_router', 'tools_router', 'xueqiu_router']

@@ -2,8 +2,11 @@
 import os
 import datetime
 import threading
-from flask import Flask, render_template
-from flask_cors import CORS
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from utils.logger import get_logger
 
@@ -12,65 +15,86 @@ load_dotenv()
 # 获取日志实例
 logger = get_logger('app')
 
-def create_app():
-    """应用工厂"""
-    app = Flask(__name__)
-    CORS(app)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动事件
+    start_background_tasks()
+    yield
+    # 关闭事件（如果需要）
 
-    # 添加请求中间件来诊断队列问题
-    @app.before_request
-    def log_request():
-        from flask import request
-        import time
-        if not request.path.startswith('/static'):
-            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 请求开始: {request.method} {request.path}")
+app = FastAPI(lifespan=lifespan)
 
-    @app.after_request
-    def log_response(response):
-        from flask import request
-        import time
-        if not request.path.startswith('/static'):
-            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 请求完成: {request.method} {request.path} - 状态: {response.status_code}")
-        return response
-    
-    # 注册蓝图
-    from api.portfolio_routes import portfolio_routes
-    from api.monitor_routes import monitor_routes
-    from api.admin_routes import admin_routes
-    from api.tools_routes import tools_routes
-    from api.xueqiu_routes import xueqiu_routes
-    
-    app.register_blueprint(portfolio_routes, url_prefix='/api/portfolio')
-    app.register_blueprint(monitor_routes, url_prefix='/api/monitor')
-    app.register_blueprint(admin_routes, url_prefix='/api/admin')
-    app.register_blueprint(tools_routes, url_prefix='/api/tools')
-    app.register_blueprint(xueqiu_routes, url_prefix='/api/xueqiu')
-    
-    # 页面路由
-    @app.route('/')
-    def index():
-        return render_template('index.html')
-    
-    @app.route('/admin')
-    def admin():
-        return render_template('admin.html')
-    
-    @app.route('/monitor')
-    def monitor():
-        return render_template('monitor.html')
-    
-    @app.route('/tools')
-    def tools():
-        return render_template('tools.html')
-    
-    @app.route('/xueqiu')
-    def xueqiu():
-        return render_template('xueqiu.html')
-    
-    return app
+# CORS配置
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+# 添加请求中间件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    import time
+    path = request.url.path
+    if not path.startswith('/static'):
+        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 请求开始: {request.method} {path}")
+    
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    
+    if not path.startswith('/static'):
+        print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] 请求完成: {request.method} {path} - 状态: {response.status_code} - 耗时: {process_time:.2f}s")
+    
+    return response
 
-def start_background_tasks(app):
+# 注册路由
+from api.portfolio_routes import portfolio_router
+from api.monitor_routes import monitor_router
+from api.admin_routes import admin_router
+from api.tools_routes import tools_router
+from api.xueqiu_routes import xueqiu_router
+
+app.include_router(portfolio_router, prefix='/api/portfolio', tags=['portfolio'])
+app.include_router(monitor_router, prefix='/api/monitor', tags=['monitor'])
+app.include_router(admin_router, prefix='/api/admin', tags=['admin'])
+app.include_router(tools_router, prefix='/api/tools', tags=['tools'])
+app.include_router(xueqiu_router, prefix='/api/xueqiu', tags=['xueqiu'])
+
+# 页面路由
+@app.get('/', response_class=HTMLResponse)
+async def index():
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="templates")
+    return templates.TemplateResponse("index.html", {"request": {}})
+
+@app.get('/admin', response_class=HTMLResponse)
+async def admin():
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="templates")
+    return templates.TemplateResponse("admin.html", {"request": {}})
+
+@app.get('/monitor', response_class=HTMLResponse)
+async def monitor():
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="templates")
+    return templates.TemplateResponse("monitor.html", {"request": {}})
+
+@app.get('/tools', response_class=HTMLResponse)
+async def tools():
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="templates")
+    return templates.TemplateResponse("tools.html", {"request": {}})
+
+@app.get('/xueqiu', response_class=HTMLResponse)
+async def xueqiu():
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="templates")
+    return templates.TemplateResponse("xueqiu.html", {"request": {}})
+
+def start_background_tasks():
     """启动后台任务"""
     if os.getenv('AUTO_UPDATE_KLINE', 'true').lower() != 'true':
         logger.warning("已禁用自动K线更新")
@@ -79,15 +103,12 @@ def start_background_tasks(app):
     from services.kline_service import KlineService
     
     def auto_update():
-        with app.app_context():
-            KlineService.auto_update_kline_data()
+        KlineService.auto_update_kline_data()
     
     t = threading.Thread(target=auto_update, daemon=True)
     t.start()
     logger.info("K线更新后台线程已启动")
 
-
 if __name__ == '__main__':
-    app = create_app()
-    start_background_tasks(app)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=5000)

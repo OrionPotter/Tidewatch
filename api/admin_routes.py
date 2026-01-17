@@ -1,151 +1,181 @@
 # api/admin_routes.py
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
 from repositories.portfolio_repository import StockRepository
 from repositories.monitor_repository import MonitorStockRepository
 from datetime import datetime
 
-admin_routes = Blueprint('admin', __name__)
+admin_router = APIRouter()
 
 # ========== 股票管理 ==========
 
-@admin_routes.route('/stocks', methods=['GET'])
+@admin_router.get('/stocks')
 def list_stocks():
     """列出所有股票"""
     stocks = StockRepository.get_all()
-    return jsonify({
+    return {
         'status': 'success',
         'data': [s.to_dict() for s in stocks]
-    })
+    }
 
-@admin_routes.route('/stocks', methods=['POST'])
-def create_stock():
+class StockCreate(BaseModel):
+    code: str
+    name: str
+    cost_price: float
+    shares: int
+
+class StockUpdate(BaseModel):
+    name: str
+    cost_price: float
+    shares: int
+
+@admin_router.post('/stocks')
+def create_stock(data: StockCreate):
     """创建股票"""
-    data = request.get_json()
     success, msg = StockRepository.add(
-        data['code'], data['name'], float(data['cost_price']), int(data['shares'])
+        data.code, data.name, data.cost_price, data.shares
     )
-    return jsonify({'status': 'success' if success else 'error', 'message': msg})
+    return {'status': 'success' if success else 'error', 'message': msg}
 
-@admin_routes.route('/stocks/<code>', methods=['PUT'])
-def update_stock(code):
+@admin_router.put('/stocks/{code}')
+def update_stock(code: str, data: StockUpdate):
     """更新股票"""
-    data = request.get_json()
     success = StockRepository.update(
-        code, data['name'], float(data['cost_price']), int(data['shares'])
+        code, data.name, data.cost_price, data.shares
     )
-    return jsonify({'status': 'success' if success else 'error', 'message':  '更新成功' if success else '更新失败'})
+    return {'status': 'success' if success else 'error', 'message':  '更新成功' if success else '更新失败'}
 
-@admin_routes.route('/stocks/<code>', methods=['DELETE'])
-def delete_stock(code):
+@admin_router.delete('/stocks/{code}')
+def delete_stock(code: str):
     """删除股票"""
     success = StockRepository.delete(code)
-    return jsonify({'status': 'success' if success else 'error', 'message':  '删除成功' if success else '删除失败'})
+    return {'status': 'success' if success else 'error', 'message':  '删除成功' if success else '删除失败'}
 
 # ========== 监控股票管理 ==========
 
-@admin_routes.route('/monitor-stocks', methods=['GET'])
+@admin_router.get('/monitor-stocks')
 def list_monitor_stocks():
     """列出所有监控股票"""
     stocks = MonitorStockRepository.get_all()
-    return jsonify({
+    return {
         'status': 'success',
         'data': [s.to_dict() for s in stocks]
-    })
+    }
 
-@admin_routes.route('/monitor-stocks', methods=['POST'])
-def create_monitor_stock():
+class MonitorStockCreate(BaseModel):
+    code: str
+    name: str
+    timeframe: str
+    reasonable_pe_min: float = 15
+    reasonable_pe_max: float = 20
+
+class MonitorStockUpdate(BaseModel):
+    name: str
+    timeframe: str
+    reasonable_pe_min: float = 15
+    reasonable_pe_max: float = 20
+
+class ToggleEnabled(BaseModel):
+    enabled: bool = True
+
+@admin_router.post('/monitor-stocks')
+def create_monitor_stock(data: MonitorStockCreate):
     """创建监控股票"""
-    data = request.get_json()
     success, msg = MonitorStockRepository.add(
-        data['code'], data['name'], data['timeframe'],
-        float(data.get('reasonable_pe_min', 15)), float(data.get('reasonable_pe_max', 20))
+        data.code, data.name, data.timeframe,
+        data.reasonable_pe_min, data.reasonable_pe_max
     )
-    return jsonify({'status': 'success' if success else 'error', 'message': msg})
+    return {'status': 'success' if success else 'error', 'message': msg}
 
-@admin_routes.route('/monitor-stocks/<code>', methods=['PUT'])
-def update_monitor_stock(code):
+@admin_router.put('/monitor-stocks/{code}')
+def update_monitor_stock(code: str, data: MonitorStockUpdate):
     """更新监控股票"""
-    data = request.get_json()
     success = MonitorStockRepository.update(
-        code, data['name'], data['timeframe'],
-        float(data.get('reasonable_pe_min', 15)), float(data.get('reasonable_pe_max', 20))
+        code, data.name, data.timeframe,
+        data.reasonable_pe_min, data.reasonable_pe_max
     )
-    return jsonify({
+    return {
         'status': 'success' if success else 'error', 
         'message': '更新成功' if success else '更新失败'
-    })
+    }
 
-@admin_routes.route('/monitor-stocks/<code>', methods=['DELETE'])
-def delete_monitor_stock(code):
+@admin_router.delete('/monitor-stocks/{code}')
+def delete_monitor_stock(code: str):
     """删除监控股票"""
     success = MonitorStockRepository.delete(code)
-    return jsonify({
+    return {
         'status': 'success' if success else 'error',
         'message': '删除成功' if success else '删除失败'
-    })
+    }
 
-@admin_routes.route('/monitor-stocks/<code>/toggle', methods=['POST'])
-def toggle_monitor_stock(code):
+@admin_router.post('/monitor-stocks/{code}/toggle')
+def toggle_monitor_stock(code: str, data: ToggleEnabled):
     """启用/禁用监控股票"""
-    data = request.get_json()
-    success = MonitorStockRepository.toggle_enabled(code, data.get('enabled', True))
-    return jsonify({
+    success = MonitorStockRepository.toggle_enabled(code, data.enabled)
+    return {
         'status': 'success' if success else 'error',
         'message': '操作成功' if success else '操作失败'
-    })
+    }
 
 # ========== 雪球组合管理 ==========
 
-@admin_routes.route('/xueqiu-cubes', methods=['GET'])
+@admin_router.get('/xueqiu-cubes')
 def list_xueqiu_cubes():
     """列出所有雪球组合"""
     from repositories.xueqiu_repository import XueqiuCubeRepository
     cubes = XueqiuCubeRepository.get_all()
-    return jsonify({
+    return {
         'status': 'success',
         'data': [cube.to_dict() for cube in cubes]
-    })
+    }
 
-@admin_routes.route('/xueqiu-cubes', methods=['POST'])
-def create_xueqiu_cube():
+class XueqiuCubeCreate(BaseModel):
+    cube_symbol: str
+    cube_name: str
+    enabled: bool = True
+
+class XueqiuCubeUpdate(BaseModel):
+    cube_name: str
+    enabled: bool = True
+
+@admin_router.post('/xueqiu-cubes')
+def create_xueqiu_cube(data: XueqiuCubeCreate):
     """创建雪球组合"""
     from repositories.xueqiu_repository import XueqiuCubeRepository
-    data = request.get_json()
     success, msg = XueqiuCubeRepository.add(
-        data['cube_symbol'], data['cube_name'], data.get('enabled', True)
+        data.cube_symbol, data.cube_name, data.enabled
     )
-    return jsonify({'status': 'success' if success else 'error', 'message': msg})
+    return {'status': 'success' if success else 'error', 'message': msg}
 
-@admin_routes.route('/xueqiu-cubes/<cube_symbol>', methods=['PUT'])
-def update_xueqiu_cube(cube_symbol):
+@admin_router.put('/xueqiu-cubes/{cube_symbol}')
+def update_xueqiu_cube(cube_symbol: str, data: XueqiuCubeUpdate):
     """更新雪球组合"""
     from repositories.xueqiu_repository import XueqiuCubeRepository
-    data = request.get_json()
     success = XueqiuCubeRepository.update(
-        cube_symbol, data['cube_name'], data.get('enabled', True)
+        cube_symbol, data.cube_name, data.enabled
     )
-    return jsonify({
+    return {
         'status': 'success' if success else 'error',
         'message': '更新成功' if success else '更新失败'
-    })
+    }
 
-@admin_routes.route('/xueqiu-cubes/<cube_symbol>', methods=['DELETE'])
-def delete_xueqiu_cube(cube_symbol):
+@admin_router.delete('/xueqiu-cubes/{cube_symbol}')
+def delete_xueqiu_cube(cube_symbol: str):
     """删除雪球组合"""
     from repositories.xueqiu_repository import XueqiuCubeRepository
     success = XueqiuCubeRepository.delete(cube_symbol)
-    return jsonify({
+    return {
         'status': 'success' if success else 'error',
         'message': '删除成功' if success else '删除失败'
-    })
+    }
 
-@admin_routes.route('/xueqiu-cubes/<cube_symbol>/toggle', methods=['POST'])
-def toggle_xueqiu_cube(cube_symbol):
+@admin_router.post('/xueqiu-cubes/{cube_symbol}/toggle')
+def toggle_xueqiu_cube(cube_symbol: str, data: ToggleEnabled):
     """启用/禁用雪球组合"""
     from repositories.xueqiu_repository import XueqiuCubeRepository
-    data = request.get_json()
-    success = XueqiuCubeRepository.toggle_enabled(cube_symbol, data.get('enabled', True))
-    return jsonify({
+    success = XueqiuCubeRepository.toggle_enabled(cube_symbol, data.enabled)
+    return {
         'status': 'success' if success else 'error',
         'message': '操作成功' if success else '操作失败'
-    })
+    }

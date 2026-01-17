@@ -1,52 +1,64 @@
-from flask import Blueprint, request, jsonify, send_file
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from io import BytesIO
 from datetime import datetime
 import pandas as pd
 
-tools_routes = Blueprint('tools', __name__)
+tools_router = APIRouter()
 
 
-@tools_routes.route('/calculate-cost', methods=['POST'])
-def calculate_cost():
+class Position(BaseModel):
+    price: float
+    shares: int
+
+
+class CalculateCostRequest(BaseModel):
+    positions: list[Position]
+
+
+@tools_router.post('/calculate-cost')
+def calculate_cost(data: CalculateCostRequest):
     try:
-        data = request.get_json()
-        positions = data.get('positions', [])
+        positions = data.positions
         
         if not positions:
-            return jsonify({'status': 'error', 'message': '请提供买入记录'}), 400
+            raise HTTPException(status_code=400, detail='请提供买入记录')
         
         total_shares = 0
         total_cost = 0
         
         for pos in positions:
-            price = float(pos.get('price', 0))
-            shares = int(pos.get('shares', 0))
+            price = pos.price
+            shares = pos.shares
             
             if price <= 0 or shares <= 0:
-                return jsonify({'status': 'error', 'message': '价格和股数必须大于0'}), 400
+                raise HTTPException(status_code=400, detail='价格和股数必须大于0')
             
             total_shares += shares
             total_cost += price * shares
         
         if total_shares == 0:
-            return jsonify({'status': 'error', 'message': '总持仓数不能为0'}), 400
+            raise HTTPException(status_code=400, detail='总持仓数不能为0')
         
         avg_cost = round(total_cost / total_shares, 2)
         
-        return jsonify({
+        return {
             'status': 'success',
             'data': {
                 'total_shares': total_shares,
                 'average_cost': avg_cost,
                 'total_cost': round(total_cost, 2)
             }
-        })
+        }
     
+    except HTTPException:
+        raise
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@tools_routes.route('/export-kline/stocks', methods=['GET'])
+@tools_router.get('/export-kline/stocks')
 def get_export_stocks():
     """获取可导出K线数据的股票列表"""
     try:
@@ -67,30 +79,36 @@ def get_export_stocks():
                 'latest_date': latest_date
             })
 
-        return jsonify({
+        return {
             'status': 'success',
             'data': result
-        })
+        }
 
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@tools_routes.route('/export-kline', methods=['POST'])
-def export_kline():
+class ExportKlineRequest(BaseModel):
+    code: str
+    format: str = 'csv'
+    start_date: str = None
+    end_date: str = None
+
+
+@tools_router.post('/export-kline')
+def export_kline(data: ExportKlineRequest):
     """导出K线数据"""
     try:
-        data = request.get_json()
-        code = data.get('code')
-        format_type = data.get('format', 'csv')  # csv 或 excel
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
+        code = data.code
+        format_type = data.format
+        start_date = data.start_date
+        end_date = data.end_date
         
         if not code:
-            return jsonify({'status': 'error', 'message': '请选择股票'}), 400
+            raise HTTPException(status_code=400, detail='请选择股票')
         
         if format_type not in ['csv', 'excel']:
-            return jsonify({'status': 'error', 'message': '不支持的导出格式'}), 400
+            raise HTTPException(status_code=400, detail='不支持的导出格式')
 
         from repositories.kline_repository import KlineRepository
         from repositories.monitor_repository import MonitorStockRepository
@@ -103,7 +121,7 @@ def export_kline():
         df = KlineRepository.export_kline_data(code, start_date, end_date)
         
         if df is None or df.empty:
-            return jsonify({'status': 'error', 'message': '没有可导出的数据'}), 400
+            raise HTTPException(status_code=400, detail='没有可导出的数据')
         
         # 生成文件名
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -115,11 +133,10 @@ def export_kline():
             df.to_csv(output, index=False, encoding='utf-8-sig')
             output.seek(0)
             
-            return send_file(
+            return StreamingResponse(
                 output,
-                mimetype='text/csv',
-                as_attachment=True,
-                download_name=filename
+                media_type='text/csv',
+                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
             )
         
         else:  # excel
@@ -131,12 +148,13 @@ def export_kline():
                 df.to_excel(writer, index=False, sheet_name='K线数据')
             output.seek(0)
             
-            return send_file(
+            return StreamingResponse(
                 output,
-                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                as_attachment=True,
-                download_name=filename
+                media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
             )
     
+    except HTTPException:
+        raise
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        raise HTTPException(status_code=500, detail=str(e))
