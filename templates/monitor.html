@@ -42,6 +42,7 @@
                 <div class="d-flex align-items-center">
                     <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
                     <a href="/tools" class="btn btn-outline-secondary me-2">🛠️ 投资工具</a>
+                    <a href="/industry-board" class="btn btn-outline-secondary me-2">🏭 行业板块</a>
                     <a href="/xueqiu" class="btn btn-outline-secondary me-2">🏔️ 雪球监控</a>
                     <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
                     <small class="text-muted me-3" id="update-time"></small>
@@ -229,9 +230,6 @@
                         tbody.appendChild(tr);
                     });
                     
-                    // 更新时间标签
-                    timeLabel.textContent = '最后更新: ' + data.timestamp;
-
                 } else {
                     tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger p-4">数据加载失败</td></tr>';
                 }

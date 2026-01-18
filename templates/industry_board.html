@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行业板块资金流向</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; padding-top: 30px; }
+        .main-container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .text-success { color: #198754 !important; }
+        .text-danger { color: #dc3545 !important; }
+        .text-muted { color: #6c757d !important; }
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table thead {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .table thead th {
+            border: none;
+            font-weight: 500;
+            padding: 12px;
+        }
+        .table tbody tr {
+            transition: background-color 0.2s;
+        }
+        .table tbody tr:hover {
+            background-color: #f0f6ff;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">🏭 行业板块资金流向</h2>
+            <div class="d-flex align-items-center">
+                <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
+                <a href="/monitor" class="btn btn-outline-secondary me-2">📊 加仓监控</a>
+                <a href="/tools" class="btn btn-outline-secondary me-2">🛠️ 投资工具</a>
+                <a href="/xueqiu" class="btn btn-outline-secondary me-2">🏔️ 雪球组合</a>
+                <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
+                <button id="refresh-btn" class="btn btn-primary">
+                    🔄 刷新数据
+                </button>
+            </div>
+        </div>
+        
+        
+        <div id="boards-container">
+            <div class="text-center p-4 text-muted">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2">正在加载数据，请稍候...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2">正在加载数据...</p>
+        </div>
+    </div>
+
+    <script>
+        // 工具函数：格式化百分比
+        function formatPercent(num) {
+            if (num === undefined || num === null || isNaN(num)) return '-';
+            return num.toFixed(2) + '%';
+        }
+        
+        // 工具函数：格式化数字
+        function formatNumber(num) {
+            if (num === undefined || num === null || isNaN(num)) return '-';
+            return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        
+        // 核心函数：从 API 获取数据并更新页面
+        async function loadData() {
+            const btn = document.getElementById('refresh-btn');
+            const container = document.getElementById('boards-container');
+            const loadingOverlay = document.getElementById('loading-overlay');
+            
+            // 显示加载遮罩
+            loadingOverlay.style.display = 'flex';
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 加载中...';
+
+            try {
+                // 发起 API 请求（添加时间戳参数绕过浏览器缓存）
+                console.log('开始请求 API...');
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/industry-board/latest?t=${timestamp}`);
+                console.log('API 响应状态:', response.status);
+                const result = await response.json();
+                console.log('API 返回数据:', result);
+
+                if (result.status === 'success') {
+                    let boards = result.data;
+                    
+                    // 渲染数据
+                    if (boards.length === 0) {
+                        container.innerHTML = `
+                            <div class="alert alert-warning">
+                                <strong>暂无数据：</strong>没有符合条件的板块数据
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    let html = '<div class="table-responsive"><table class="table table-hover mb-0">';
+                    html += `
+                        <thead>
+                            <tr>
+                                <th class="text-center">序号</th>
+                                <th>行业</th>
+                                <th class="text-end">阶段涨跌幅</th>
+                                <th class="text-end">流入资金(亿)</th>
+                                <th class="text-end">流出资金(亿)</th>
+                                <th class="text-end">净额(亿)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+                    
+                    boards.forEach(board => {
+                        const changeClass = board.change_percent > 0 ? 'text-success' : (board.change_percent < 0 ? 'text-danger' : 'text-muted');
+                        const netClass = board.net_amount > 0 ? 'text-success' : (board.net_amount < 0 ? 'text-danger' : 'text-muted');
+                        const changeSign = board.change_percent > 0 ? '+' : '';
+                        const netSign = board.net_amount > 0 ? '+' : '';
+                        
+                        html += `
+                            <tr>
+                                <td class="text-center">${board.rank || '-'}</td>
+                                <td>
+                                    <strong>${board.board_name}</strong>
+                                    ${board.board_code ? `<br><small class="text-muted">${board.board_code}</small>` : ''}
+                                </td>
+                                <td class="text-end ${changeClass}"><strong>${changeSign}${formatPercent(board.change_percent)}</strong></td>
+                                <td class="text-end">${formatNumber(board.inflow)}</td>
+                                <td class="text-end">${formatNumber(board.outflow)}</td>
+                                <td class="text-end ${netClass}"><strong>${netSign}${formatNumber(board.net_amount)}</strong></td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += '</tbody></table></div>';
+                    container.innerHTML = html;
+
+                } else {
+                    container.innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>数据加载失败：</strong>${result.message || '未知错误'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                console.error("Error details:", error.message, error.stack);
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>网络请求错误：</strong>${error.message || '请检查连接或服务器状态。'}
+                    </div>
+                `;
+            } finally {
+                // 隐藏加载遮罩，恢复按钮状态
+                loadingOverlay.style.display = 'none';
+                btn.disabled = false;
+                btn.innerHTML = '🔄 刷新数据';
+            }
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', loadData);
+
+        // 绑定刷新按钮的点击事件
+        document.getElementById('refresh-btn').addEventListener('click', loadData);
+    </script>
+</body>
+</html>

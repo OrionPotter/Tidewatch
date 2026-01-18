@@ -95,6 +95,7 @@ from api.admin_routes import admin_router
 from api.tools_routes import tools_router
 from api.xueqiu_routes import xueqiu_router
 from api.stock_list_routes import stock_list_router
+from api.industry_board_routes import industry_board_router
 
 app.include_router(portfolio_router, prefix='/api/portfolio', tags=['portfolio'])
 app.include_router(monitor_router, prefix='/api/monitor', tags=['monitor'])
@@ -102,7 +103,7 @@ app.include_router(admin_router, prefix='/api/admin', tags=['admin'])
 app.include_router(tools_router, prefix='/api/tools', tags=['tools'])
 app.include_router(xueqiu_router, prefix='/api/xueqiu', tags=['xueqiu'])
 app.include_router(stock_list_router, prefix='/api/stock-list', tags=['stock-list'])
-app.include_router(xueqiu_router, prefix='/api/xueqiu', tags=['xueqiu'])
+app.include_router(industry_board_router, prefix='/api/industry-board', tags=['industry-board'])
 
 # 页面路由
 @app.get('/', response_class=HTMLResponse)
@@ -134,6 +135,12 @@ async def xueqiu():
     from fastapi.templating import Jinja2Templates
     templates = Jinja2Templates(directory="templates")
     return templates.TemplateResponse("xueqiu.html", {"request": {}})
+
+@app.get('/industry-board', response_class=HTMLResponse)
+async def industry_board():
+    from fastapi.templating import Jinja2Templates
+    templates = Jinja2Templates(directory="templates")
+    return templates.TemplateResponse("industry_board.html", {"request": {}})
 
 
 def start_background_tasks():

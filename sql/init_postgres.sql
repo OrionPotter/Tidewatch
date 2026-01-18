@@ -299,3 +299,61 @@ CREATE TABLE IF NOT EXISTS eps_cache (
 
 -- EPS 缓存索引
 CREATE INDEX IF NOT EXISTS idx_eps_cache_updated_at ON eps_cache(updated_at);
+
+-- ============================================
+-- 行业板块历史数据表
+-- ============================================
+CREATE TABLE IF NOT EXISTS industry_board_history (
+    id SERIAL PRIMARY KEY,
+    board_code VARCHAR(20) NOT NULL,           -- 板块代码
+    board_name VARCHAR(50) NOT NULL,           -- 板块名称
+    trade_date DATE NOT NULL,                  -- 交易日期
+    rank INTEGER,                              -- 当日排名
+    latest_price NUMERIC(10, 2),               -- 最新价
+    change_amount NUMERIC(10, 2),              -- 涨跌额
+    change_percent NUMERIC(6, 2),              -- 涨跌幅(%)
+    market_cap BIGINT,                         -- 总市值
+    turnover_rate NUMERIC(6, 2),               -- 换手率(%)
+    up_count INTEGER,                          -- 上涨家数
+    down_count INTEGER,                         -- 下跌家数
+    leading_stock VARCHAR(50),                 -- 领涨股票
+    leading_stock_change_percent NUMERIC(6, 2),-- 领涨股票涨跌幅(%)
+    
+    -- 资金流向字段（从 10jqka 获取）
+    company_count INTEGER,                      -- 公司家数
+    index_value NUMERIC(10, 2),                -- 行业指数
+    inflow NUMERIC(10, 2),                     -- 流入资金(亿)
+    outflow NUMERIC(10, 2),                    -- 流出资金(亿)
+    net_amount NUMERIC(10, 2),                 -- 净额(亿)
+    
+    -- 计算字段（用于分析）
+    avg_price_3d NUMERIC(10, 2),               -- 3日均价
+    avg_price_7d NUMERIC(10, 2),               -- 7日均价
+    price_trend_3d VARCHAR(10),                -- 3日趋势(up/down/flat)
+    price_trend_7d VARCHAR(10),                -- 7日趋势(up/down/flat)
+    turnover_avg_3d NUMERIC(6, 2),             -- 3日平均换手率
+    turnover_avg_7d NUMERIC(6, 2),             -- 7日平均换手率
+    turnover_trend_3d VARCHAR(10),             -- 换手率3日趋势
+    turnover_trend_7d VARCHAR(10),             -- 换手率7日趋势
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    UNIQUE(board_code, trade_date)
+);
+
+-- 行业板块表索引
+CREATE INDEX IF NOT EXISTS idx_industry_board_code ON industry_board_history(board_code);
+CREATE INDEX IF NOT EXISTS idx_industry_trade_date ON industry_board_history(trade_date);
+CREATE INDEX IF NOT EXISTS idx_industry_board_date ON industry_board_history(board_code, trade_date);
+
+-- 行业板块表注释
+COMMENT ON TABLE industry_board_history IS '行业板块历史数据表';
+COMMENT ON COLUMN industry_board_history.price_trend_3d IS '3日价格趋势: up-上涨, down-下跌, flat-持平';
+COMMENT ON COLUMN industry_board_history.turnover_trend_3d IS '3日换手率趋势: up-上升, down-下降, flat-持平';
+
+-- ============================================
+-- 添加 last_update 字段到 stock_list 表
+-- ============================================
+ALTER TABLE stock_list ADD COLUMN IF NOT EXISTS last_update TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_stock_list_last_update ON stock_list(last_update);

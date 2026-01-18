@@ -1,6 +1,6 @@
 from utils.db import get_db_conn
 from utils.logger import get_logger
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
 logger = get_logger('kline_repository')
@@ -258,23 +258,33 @@ class KlineRepository:
         if not codes:
             return []
 
+        # 计算最近一个交易日
+        now = datetime.now()
+        weekday = now.weekday()  # 0=周一, 6=周日
+        
+        # 找到最近的交易日（如果是周末，往前推到周五）
+        if weekday == 5:  # 周六
+            latest_trade_date = (now - timedelta(days=1)).strftime('%Y-%m-%d')  # 周五
+        elif weekday == 6:  # 周日
+            latest_trade_date = (now - timedelta(days=2)).strftime('%Y-%m-%d')  # 周五
+        else:
+            latest_trade_date = now.strftime('%Y-%m-%d')  # 周一到周五
+        
         # 使用批量查询一次性获取所有股票的最新日期
         latest_dates_dict = await KlineRepository.get_latest_dates_batch(codes)
         
         # 过滤出需要更新的股票
         need_update = []
-        now = datetime.now()
+        need_update_details = []
         
         for code in codes:
             latest = latest_dates_dict.get(code)
-            if not latest:
+            # 只有当最新日期不是最近交易日时才需要更新
+            if latest != latest_trade_date:
                 need_update.append(code)
-            else:
-                latest_dt = datetime.strptime(latest, '%Y-%m-%d')
-                if (now - latest_dt).days >= days:
-                    need_update.append(code)
+                need_update_details.append(f"{code}(最新:{latest}, 最近交易日:{latest_trade_date})")
         
-        logger.info(f"SQL: 筛选出 {len(need_update)} 只股票需要更新")
+        logger.info(f"SQL: 筛选出 {len(need_update)} 只股票需要更新，详情: {need_update_details[:5]}...")
         return need_update
 
     @staticmethod

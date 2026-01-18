@@ -19,14 +19,6 @@ def setup_logger(name='tidewatch', level=logging.INFO):
     if _logger_initialized:
         return logging.getLogger(name)
 
-    # 创建日志目录
-    log_dir = 'logs'
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
-    # 创建日志文件名（按日期）
-    log_file = os.path.join(log_dir, f"{name}_{datetime.now().strftime('%Y%m%d')}.log")
-
     # 获取根logger
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
@@ -42,18 +34,12 @@ def setup_logger(name='tidewatch', level=logging.INFO):
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-    # 创建文件handler
-    file_handler = logging.FileHandler(log_file, encoding='utf-8')
-    file_handler.setLevel(level)
-    file_handler.setFormatter(formatter)
-
-    # 创建控制台handler
+    # 只创建控制台handler，不写文件（避免触发热重载）
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
 
     # 添加handler到根logger
-    root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
 
     _logger_initialized = True

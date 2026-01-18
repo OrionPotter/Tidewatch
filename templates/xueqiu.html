@@ -51,6 +51,7 @@
             <div class="d-flex align-items-center">
                 <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
                 <a href="/monitor" class="btn btn-outline-secondary me-2">📊 加仓监控</a>
+                <a href="/industry-board" class="btn btn-outline-secondary me-2">🏭 行业板块</a>
                 <a href="/tools" class="btn btn-outline-secondary me-2">🛠️ 投资工具</a>
                 <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
                 <small class="text-muted me-3" id="update-time"></small>
@@ -60,9 +61,6 @@
             </div>
         </div>
         
-        <div class="alert alert-info">
-            <strong>监控说明：</strong>实时监控雪球组合的调仓历史和仓位变动信息，帮助跟踪投资策略的调整。
-        </div>
         
         <div id="cubes-container">
             <div class="text-center p-4 text-muted">
@@ -194,8 +192,6 @@
                         tbody.appendChild(tr);
                     });
                     
-                    // 更新时间标签
-                    timeLabel.textContent = '最后更新: ' + result.timestamp + ' | 共 ' + allRecords.length + ' 条记录';
 
                 } else {
                     allRecordsContainer.innerHTML = `
