@@ -42,7 +42,7 @@ class KlineService:
             
             # 确定数据范围
             if force_update:
-                start_date = "20200101"
+                start_date = "20210101"
             else:
                 if latest_date:
                     latest = latest_date
@@ -54,7 +54,7 @@ class KlineService:
                     start_date = next_day
                 else:
                     # 没有历史数据，从2020年开始获取
-                    start_date = "20200101"
+                    start_date = "20210101"
             
             end_date = datetime.now().strftime('%Y%m%d')
             

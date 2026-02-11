@@ -141,7 +141,7 @@ class PortfolioService:
         for stock in stocks:
             code = stock.code
             name = stock.name
-            cost_price = stock.cost_price
+            cost_price = round(stock.cost_price, 2)
             shares = stock.shares
 
             data = stock_data_map.get(code, {})

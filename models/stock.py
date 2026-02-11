@@ -18,6 +18,6 @@ class Stock:
             'id': self.id,
             'code': self.code,
             'name': self.name,
-            'cost_price': self.cost_price,
+            'cost_price': round(self.cost_price, 2),
             'shares': self.shares
         }
