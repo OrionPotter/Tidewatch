@@ -120,6 +120,7 @@ class ExportKlineRequest(BaseModel):
 @tools_router.post('/export-kline')
 async def export_kline(data: ExportKlineRequest):
     """导出K线数据"""
+    logger.info(f"POST /api/tools/export-kline - 请求开始: code={data.code}, format={data.format}, start={data.start_date}, end={data.end_date}")
     try:
         code = data.code
         format_type = data.format
@@ -127,9 +128,11 @@ async def export_kline(data: ExportKlineRequest):
         end_date = data.end_date
 
         if not code:
+            logger.error("POST /api/tools/export-kline - 股票代码为空")
             raise HTTPException(status_code=400, detail='请选择股票')
 
         if format_type not in ['csv', 'excel']:
+            logger.error(f"POST /api/tools/export-kline - 不支持的格式: {format_type}")
             raise HTTPException(status_code=400, detail='不支持的导出格式')
 
         from repositories.kline_repository import KlineRepository
@@ -138,43 +141,70 @@ async def export_kline(data: ExportKlineRequest):
         # 获取股票名称
         stock = await MonitorStockRepository.get_by_code(code)
         stock_name = stock.name if stock else code
+        logger.info(f"POST /api/tools/export-kline - 股票: {stock_name} ({code})")
 
         # 获取K线数据
         df = await KlineRepository.export_kline_data(code, start_date, end_date)
+        logger.info(f"POST /api/tools/export-kline - 获取到数据: {len(df) if df is not None else 0} 条")
 
         if df is None or df.empty:
+            logger.error(f"POST /api/tools/export-kline - 没有可导出的数据")
             raise HTTPException(status_code=400, detail='没有可导出的数据')
 
+        # 对数值列进行四舍五入，保留2位小数
+        numeric_cols = ['开盘', '收盘', '最高', '最低']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = df[col].round(2)
+
         # 生成文件名
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         if format_type == 'csv':
-            filename = f'{stock_name}_{code}_K线_{timestamp}.csv'
+            if start_date and end_date:
+                filename = f'{code}-{start_date}-{end_date}.csv'
+            elif start_date:
+                filename = f'{code}-{start_date}.csv'
+            elif end_date:
+                filename = f'{code}-{end_date}.csv'
+            else:
+                filename = f'{code}.csv'
+            logger.info(f"POST /api/tools/export-kline - CSV文件名: {filename}")
 
             # 创建CSV文件
             output = BytesIO()
             df.to_csv(output, index=False, encoding='utf-8-sig')
             output.seek(0)
 
-            return StreamingResponse(
+            response = StreamingResponse(
                 output,
-                media_type='text/csv',
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+                media_type='text/csv'
             )
+            response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+            return response
 
         else:  # excel
-            filename = f'{stock_name}_{code}_K线_{timestamp}.xlsx'
+            if start_date and end_date:
+                filename = f'{code}-{start_date}-{end_date}.xlsx'
+            elif start_date:
+                filename = f'{code}-{start_date}.xlsx'
+            elif end_date:
+                filename = f'{code}-{end_date}.xlsx'
+            else:
+                filename = f'{code}.xlsx'
+            logger.info(f"POST /api/tools/export-kline - Excel文件名: {filename}")
 
             # 创建Excel文件
             output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, sheet_name='K线数据')
+            writer = pd.ExcelWriter(output, engine='openpyxl')
+            df.to_excel(writer, index=False, sheet_name='K线数据')
+            writer.close()
             output.seek(0)
 
-            return StreamingResponse(
+            response = StreamingResponse(
                 output,
-                media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+                media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
             )
+            response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+            return response
 
     except HTTPException:
         raise

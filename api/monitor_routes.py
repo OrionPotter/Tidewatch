@@ -177,11 +177,13 @@ async def update_kline(data: UpdateKline):
     """手动更新K线数据"""
     try:
         from services.kline_service import KlineService
+        import asyncio
 
-        def task():
-            KlineService.batch_update_kline(force_update=data.force_update, max_workers=3)
-
-        threading.Thread(target=task, daemon=True).start()
+        # 在后台任务中运行，不使用新线程
+        asyncio.create_task(KlineService.batch_update_kline_async(
+            force_update=data.force_update,
+            max_concurrent=3
+        ))
         return {'status': 'success', 'message': 'K线更新任务已启动'}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

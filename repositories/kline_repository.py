@@ -378,6 +378,10 @@ class KlineRepository:
                 )
 
             if rows:
-                df = pd.DataFrame(rows, columns=['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额'])
+                # 将数据库记录转换为字典列表
+                data = [dict(row) for row in rows]
+                # 创建 DataFrame 并设置中文列名
+                df = pd.DataFrame(data)
+                df.columns = ['日期', '开盘', '收盘', '最高', '最低', '成交量', '成交额']
                 return df
             return None
