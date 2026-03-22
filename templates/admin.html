@@ -1,700 +1,382 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>股票数据管理</title>
+    <title>数据管理 · Tidewatch</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; padding-top: 30px; }
-        .main-container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .text-end { text-align: right !important; }
-        thead th {
-            background-color: #e9ecef;
-            font-weight: 600;
-        }
-        .form-container {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-    </style>
+    <link href="/static/styles.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container main-container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">📊 股票数据管理</h2>
-            <div>
-                <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
-                <a href="/tools" class="btn btn-outline-secondary me-2">🛠️ 投资工具</a>
-                <a href="/monitor" class="btn btn-outline-secondary me-2">📊 加仓监控</a>
-                <a href="/industry-board" class="btn btn-outline-secondary me-2">🏭 行业板块</a>
-                <a href="/xueqiu" class="btn btn-outline-secondary">🏔️ 雪球监控</a>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title">
+                <h1>数据管理后台</h1>
+                <p>把持仓、监控股票和雪球组合集中到同一个控制台，重点优化录入效率、信息对比和操作反馈。</p>
             </div>
         </div>
-        
-        <!-- 添加/编辑表单 -->
-        <div class="form-container">
-            <h4 id="form-title">股票资产管理</h4>
-            <form id="stock-form">
-                <input type="hidden" id="edit-id" value="">
-                <div class="row align-items-end">
-                    <div class="col-md-3 mb-3">
-                        <label for="code" class="form-label">股票代码</label>
-                        <input type="text" class="form-control" id="code" placeholder="例如: sh600900, sz000895" required>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label for="name" class="form-label">股票名称</label>
-                        <input type="text" class="form-control" id="name" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="cost_price" class="form-label">成本价格</label>
-                        <input type="number" class="form-control" id="cost_price" step="0.01" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="shares" class="form-label">持仓股数</label>
-                        <input type="number" class="form-control" id="shares" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <button type="submit" class="btn btn-primary w-100">保存</button>
-                    </div>
-                </div>
-            </form>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">组合</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip" href="/tools">工具</a>
+            <a class="nav-chip" href="/industry-board">行业板块</a>
+            <a class="nav-chip" href="/xueqiu">雪球组合</a>
+            <a class="nav-chip is-active" href="/admin">数据管理</a>
         </div>
-        
-        <!-- 股票列表 -->
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>股票代码</th>
-                        <th>名称</th>
-                        <th class="text-end">成本价格</th>
-                        <th class="text-end">持仓股数</th>
-                        <th class="text-end">操作</th>
-                    </tr>
-                </thead>
-                <tbody id="stocks-table-body">
-                    <tr><td colspan="5" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- 监控股票管理 -->
-        <div class="form-container mt-5">
-            <h4>监控股票管理</h4>
-            <form id="monitor-form">
-                <input type="hidden" id="monitor-edit-id" value="">
-                <div class="row align-items-end">
-                    <div class="col-md-2 mb-3">
-                        <label for="monitor-code" class="form-label">股票代码</label>
-                        <input type="text" class="form-control" id="monitor-code" placeholder="例如: sh600900, sz000895" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="monitor-name" class="form-label">股票名称</label>
-                        <input type="text" class="form-control" id="monitor-name" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="monitor-timeframe" class="form-label">时间维度</label>
-                        <select class="form-control" id="monitor-timeframe" required>
-                            <option value="1d">日K线</option>
-                            <option value="2d">2日K线</option>
-                            <option value="3d">3日K线</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="monitor-reasonable-pe-min" class="form-label">合理估值(PE)最小值</label>
-                        <input type="number" class="form-control" id="monitor-reasonable-pe-min" step="0.1" value="15" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="monitor-reasonable-pe-max" class="form-label">合理估值(PE)最大值</label>
-                        <input type="number" class="form-control" id="monitor-reasonable-pe-max" step="0.1" value="20" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <button type="submit" class="btn btn-primary w-100">添加监控股票</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-        
-        <!-- 监控股票列表 -->
-        <div class="table-responsive mt-3">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>股票代码</th>
-                        <th>名称</th>
-                        <th class="text-center">时间维度</th>
-                        <th class="text-end">合理估值(PE)范围</th>
-                        <th class="text-center">状态</th>
-                        <th class="text-end">操作</th>
-                    </tr>
-                </thead>
-                <tbody id="monitor-table-body">
-                    <tr><td colspan="6" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <!-- 雪球组合管理 -->
-        <div class="form-container mt-5">
-            <h4>雪球组合管理</h4>
-            <form id="xueqiu-form">
-                <input type="hidden" id="xueqiu-edit-id" value="">
-                <div class="row align-items-end">
-                    <div class="col-md-4 mb-3">
-                        <label for="xueqiu-symbol" class="form-label">组合ID</label>
-                        <input type="text" class="form-control" id="xueqiu-symbol" placeholder="例如: ZH2363479" required>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label for="xueqiu-name" class="form-label">组合名称</label>
-                        <input type="text" class="form-control" id="xueqiu-name" placeholder="例如: 万万没想到" required>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="xueqiu-enabled" class="form-label">状态</label>
-                        <select class="form-control" id="xueqiu-enabled">
-                            <option value="true">启用</option>
-                            <option value="false">禁用</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <button type="submit" class="btn btn-primary w-100">添加组合</button>
-                    </div>
-                </div>
-            </form>
-        </div>
-        
-        <!-- 雪球组合列表 -->
-        <div class="table-responsive mt-3">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>组合ID</th>
-                        <th>组合名称</th>
-                        <th class="text-center">状态</th>
-                        <th class="text-end">操作</th>
-                    </tr>
-                </thead>
-                <tbody id="xueqiu-table-body">
-                    <tr><td colspan="4" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+    </section>
 
-    <script>
-        let editingStock = null;
-        let editingMonitorStock = null;
-        
-        // 工具函数：格式化数字为金额字符串
-        function formatMoney(num) {
-            if (num === undefined || num === null) return '-';
-            return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    <section class="surface section">
+        <div class="metrics-grid">
+            <div class="metric-card"><div class="metric-label">持仓条目</div><div class="metric-value mono" id="metric-stocks">-</div><div class="metric-sub">投资组合中的股票数量</div></div>
+            <div class="metric-card"><div class="metric-label">监控条目</div><div class="metric-value mono" id="metric-monitors">-</div><div class="metric-sub">当前配置的监控股票数</div></div>
+            <div class="metric-card"><div class="metric-label">启用监控</div><div class="metric-value mono" id="metric-enabled-monitors">-</div><div class="metric-sub">正在启用的监控股票</div></div>
+            <div class="metric-card"><div class="metric-label">雪球组合</div><div class="metric-value mono" id="metric-cubes">-</div><div class="metric-sub">已配置的组合数量</div></div>
+        </div>
+    </section>
+
+    <section class="surface section">
+        <div class="panel-card">
+            <div class="panel-card-header">
+                <div>
+                    <h4 id="form-title">持仓股票管理</h4>
+                    <p class="mb-0 text-muted small">管理投资组合中的基础持仓数据。</p>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <form id="stock-form" class="form-panel">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-3"><label for="code" class="form-label">股票代码</label><input type="text" class="form-control" id="code" placeholder="如 sh600900" required></div>
+                        <div class="col-lg-3"><label for="name" class="form-label">股票名称</label><input type="text" class="form-control" id="name" required></div>
+                        <div class="col-lg-2"><label for="cost_price" class="form-label">成本价格</label><input type="number" class="form-control" id="cost_price" step="0.01" required></div>
+                        <div class="col-lg-2"><label for="shares" class="form-label">持仓股数</label><input type="number" class="form-control" id="shares" required></div>
+                        <div class="col-lg-2 d-flex gap-2"><button type="submit" class="btn btn-primary w-100">保存</button><button type="button" class="btn btn-outline-secondary w-100" onclick="resetForm()">重置</button></div>
+                    </div>
+                </form>
+                <div class="table-wrap mt-4">
+                    <table class="table-modern">
+                        <thead><tr><th>代码</th><th>名称</th><th class="text-end">成本价</th><th class="text-end">持仓股数</th><th class="text-end">操作</th></tr></thead>
+                        <tbody id="stocks-table-body"><tr><td colspan="5" class="empty-state">正在加载数据...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="surface section">
+        <div class="panel-card">
+            <div class="panel-card-header">
+                <div>
+                    <h4>监控股票管理</h4>
+                    <p class="mb-0 text-muted small">定义周期和合理估值区间，为监控页提供分析基础。</p>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <form id="monitor-form" class="form-panel">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-2"><label for="monitor-code" class="form-label">股票代码</label><input type="text" class="form-control" id="monitor-code" placeholder="如 sz000895" required></div>
+                        <div class="col-lg-2"><label for="monitor-name" class="form-label">股票名称</label><input type="text" class="form-control" id="monitor-name" required></div>
+                        <div class="col-lg-2"><label for="monitor-timeframe" class="form-label">周期</label><select class="form-select" id="monitor-timeframe" required><option value="1d">日线</option><option value="2d">2日线</option><option value="3d">3日线</option></select></div>
+                        <div class="col-lg-2"><label for="monitor-reasonable-pe-min" class="form-label">PE 最小值</label><input type="number" class="form-control" id="monitor-reasonable-pe-min" step="0.1" value="15" required></div>
+                        <div class="col-lg-2"><label for="monitor-reasonable-pe-max" class="form-label">PE 最大值</label><input type="number" class="form-control" id="monitor-reasonable-pe-max" step="0.1" value="20" required></div>
+                        <div class="col-lg-2 d-flex gap-2"><button type="submit" class="btn btn-primary w-100">保存</button><button type="button" class="btn btn-outline-secondary w-100" onclick="resetMonitorForm()">重置</button></div>
+                    </div>
+                </form>
+                <div class="table-wrap mt-4">
+                    <table class="table-modern">
+                        <thead><tr><th>代码</th><th>名称</th><th class="text-center">周期</th><th class="text-end">PE 区间</th><th class="text-center">状态</th><th class="text-end">操作</th></tr></thead>
+                        <tbody id="monitor-table-body"><tr><td colspan="6" class="empty-state">正在加载数据...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="surface section">
+        <div class="panel-card">
+            <div class="panel-card-header">
+                <div>
+                    <h4>雪球组合管理</h4>
+                    <p class="mb-0 text-muted small">维护组合 ID 与显示名称，并控制前台是否启用展示。</p>
+                </div>
+            </div>
+            <div class="panel-card-body">
+                <form id="xueqiu-form" class="form-panel">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-lg-4"><label for="xueqiu-symbol" class="form-label">组合 ID</label><input type="text" class="form-control" id="xueqiu-symbol" placeholder="如 ZH2363479" required></div>
+                        <div class="col-lg-4"><label for="xueqiu-name" class="form-label">组合名称</label><input type="text" class="form-control" id="xueqiu-name" placeholder="输入前台展示名称" required></div>
+                        <div class="col-lg-2"><label for="xueqiu-enabled" class="form-label">状态</label><select class="form-select" id="xueqiu-enabled"><option value="true">启用</option><option value="false">禁用</option></select></div>
+                        <div class="col-lg-2 d-flex gap-2"><button type="submit" class="btn btn-primary w-100">保存</button><button type="button" class="btn btn-outline-secondary w-100" onclick="resetXueqiuForm()">重置</button></div>
+                    </div>
+                </form>
+                <div class="table-wrap mt-4">
+                    <table class="table-modern">
+                        <thead><tr><th>组合 ID</th><th>组合名称</th><th class="text-center">状态</th><th class="text-end">操作</th></tr></thead>
+                        <tbody id="xueqiu-table-body"><tr><td colspan="4" class="empty-state">正在加载数据...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+let editingStock = null;
+let editingMonitorStock = null;
+let editingXueqiuCube = null;
+
+function formatMoney(num) {
+    if (num === undefined || num === null) return '-';
+    return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function softBadge(text, tone) { return `<span class="badge-soft ${tone}">${text}</span>`; }
+function updateMetrics({ stocks = 0, monitors = 0, enabledMonitors = 0, cubes = 0 }) {
+    document.getElementById('metric-stocks').textContent = stocks;
+    document.getElementById('metric-monitors').textContent = monitors;
+    document.getElementById('metric-enabled-monitors').textContent = enabledMonitors;
+    document.getElementById('metric-cubes').textContent = cubes;
+}
+
+async function loadStocks() {
+    try {
+        const response = await fetch('/api/admin/stocks');
+        const result = await response.json();
+        const tbody = document.getElementById('stocks-table-body');
+        tbody.innerHTML = '';
+        const items = result.data || [];
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state">暂无持仓股票数据</td></tr>';
+        } else {
+            items.forEach(stock => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="mono">${stock.code}</td>
+                    <td><strong>${stock.name}</strong></td>
+                    <td class="text-end mono">${formatMoney(stock.cost_price)}</td>
+                    <td class="text-end mono">${stock.shares.toLocaleString()}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">编辑</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteStock('${stock.code}')">删除</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
         }
-        
-        // 核心函数：从 API 获取股票数据并更新页面
-        async function loadStocks() {
-            try {
-                const response = await fetch('/api/admin/stocks');
-                const result = await response.json();
-                
-                const tbody = document.getElementById('stocks-table-body');
-                tbody.innerHTML = '';
-                
-                if (!result.data || result.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-muted">暂无股票数据</td></tr>';
-                    return;
-                }
-                
-                result.data.forEach(stock => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td>${stock.code}</td>
-                        <td>${stock.name}</td>
-                        <td class="text-end">${formatMoney(stock.cost_price)}</td>
-                        <td class="text-end">${stock.shares.toLocaleString()}</td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary me-2" onclick="editStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">编辑</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteStock('${stock.code}')">删除</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) {
-                console.error("加载股票数据失败:", error);
-                document.getElementById('stocks-table-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger p-4">加载数据失败</td></tr>';
-            }
+        const current = Number(document.getElementById('metric-monitors').textContent) || 0;
+        const enabled = Number(document.getElementById('metric-enabled-monitors').textContent) || 0;
+        const cubes = Number(document.getElementById('metric-cubes').textContent) || 0;
+        updateMetrics({ stocks: items.length, monitors: current, enabledMonitors: enabled, cubes });
+    } catch (error) {
+        document.getElementById('stocks-table-body').innerHTML = '<tr><td colspan="5" class="empty-state text-danger">加载持仓数据失败</td></tr>';
+    }
+}
+
+async function saveStock(event) {
+    event.preventDefault();
+    const code = document.getElementById('code').value.trim();
+    const name = document.getElementById('name').value.trim();
+    const costPrice = document.getElementById('cost_price').value;
+    const shares = document.getElementById('shares').value;
+    if (!code || !name || !costPrice || !shares) return alert('请填写所有字段');
+    const stockData = { code, name, cost_price: parseFloat(costPrice), shares: parseInt(shares) };
+    const url = editingStock ? `/api/admin/stocks/${editingStock.code}` : '/api/admin/stocks';
+    const method = editingStock ? 'PUT' : 'POST';
+    try {
+        const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stockData) });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); resetForm(); loadStocks(); } else alert(result.message || '操作失败');
+    } catch (error) { alert('保存失败，请检查网络连接'); }
+}
+function editStock(stock) {
+    editingStock = stock;
+    document.getElementById('form-title').textContent = '编辑持仓股票';
+    document.getElementById('code').value = stock.code;
+    document.getElementById('name').value = stock.name;
+    document.getElementById('cost_price').value = stock.cost_price;
+    document.getElementById('shares').value = stock.shares;
+    document.getElementById('code').disabled = true;
+}
+async function deleteStock(code) {
+    if (!confirm(`确定删除股票 ${code} 吗？`)) return;
+    try {
+        const response = await fetch(`/api/admin/stocks/${code}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); loadStocks(); } else alert(result.message || '删除失败');
+    } catch (error) { alert('删除失败，请检查网络连接'); }
+}
+function resetForm() {
+    document.getElementById('stock-form').reset();
+    document.getElementById('form-title').textContent = '持仓股票管理';
+    document.getElementById('code').disabled = false;
+    editingStock = null;
+}
+
+async function loadMonitorStocks() {
+    try {
+        const response = await fetch('/api/admin/monitor-stocks');
+        const result = await response.json();
+        const tbody = document.getElementById('monitor-table-body');
+        tbody.innerHTML = '';
+        const items = result.data || [];
+        const timeframeMap = { '1d': '日线', '2d': '2日线', '3d': '3日线' };
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无监控股票数据</td></tr>';
+        } else {
+            items.forEach(stock => {
+                const tr = document.createElement('tr');
+                const statusBadge = stock.enabled ? softBadge('启用', 'badge-success-soft') : softBadge('禁用', 'badge-gray-soft');
+                tr.innerHTML = `
+                    <td class="mono">${stock.code}</td>
+                    <td><strong>${stock.name}</strong></td>
+                    <td class="text-center">${softBadge(timeframeMap[stock.timeframe] || stock.timeframe, 'badge-primary-soft')}</td>
+                    <td class="text-end mono">${stock.reasonable_pe_min || 15} - ${stock.reasonable_pe_max || 20}</td>
+                    <td class="text-center">${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editMonitorStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">编辑</button>
+                        <button class="btn btn-sm btn-outline-${stock.enabled ? 'warning' : 'success'} me-2" onclick="toggleMonitorStock('${stock.code}', ${!stock.enabled})">${stock.enabled ? '禁用' : '启用'}</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteMonitorStock('${stock.code}')">删除</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
         }
-        
-        // 添加或更新股票
-        async function saveStock(event) {
-            event.preventDefault();
-            
-            const code = document.getElementById('code').value.trim();
-            const name = document.getElementById('name').value.trim();
-            const costPrice = document.getElementById('cost_price').value;
-            const shares = document.getElementById('shares').value;
-            
-            if (!code || !name || !costPrice || !shares) {
-                alert('请填写所有字段');
-                return;
-            }
-            
-            const stockData = {
-                code: code,
-                name: name,
-                cost_price: parseFloat(costPrice),
-                shares: parseInt(shares)
-            };
-            
-            let url, method;
-            if (editingStock) {
-                // 更新现有股票
-                url = `/api/admin/stocks/${editingStock.code}`;
-                method = 'PUT';
-            } else {
-                // 添加新股票
-                url = '/api/admin/stocks';
-                method = 'POST';
-            }
-            
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(stockData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    resetForm();
-                    loadStocks();
-                } else {
-                    alert(result.message || '操作失败');
-                }
-            } catch (error) {
-                console.error("保存股票失败:", error);
-                alert('保存失败，请检查网络连接');
-            }
+        const stocks = Number(document.getElementById('metric-stocks').textContent) || 0;
+        const cubes = Number(document.getElementById('metric-cubes').textContent) || 0;
+        updateMetrics({ stocks, monitors: items.length, enabledMonitors: items.filter(item => item.enabled).length, cubes });
+    } catch (error) {
+        document.getElementById('monitor-table-body').innerHTML = '<tr><td colspan="6" class="empty-state text-danger">加载监控股票失败</td></tr>';
+    }
+}
+async function saveMonitorStock(event) {
+    event.preventDefault();
+    const code = document.getElementById('monitor-code').value.trim();
+    const name = document.getElementById('monitor-name').value.trim();
+    const timeframe = document.getElementById('monitor-timeframe').value;
+    const reasonablePeMin = document.getElementById('monitor-reasonable-pe-min').value;
+    const reasonablePeMax = document.getElementById('monitor-reasonable-pe-max').value;
+    if (!code || !name || !timeframe || !reasonablePeMin || !reasonablePeMax) return alert('请填写所有字段');
+    if (parseFloat(reasonablePeMin) >= parseFloat(reasonablePeMax)) return alert('PE 最小值必须小于最大值');
+    const stockData = { code, name, timeframe, reasonable_pe_min: parseFloat(reasonablePeMin), reasonable_pe_max: parseFloat(reasonablePeMax) };
+    const url = editingMonitorStock ? `/api/admin/monitor-stocks/${editingMonitorStock.code}` : '/api/admin/monitor-stocks';
+    const method = editingMonitorStock ? 'PUT' : 'POST';
+    try {
+        const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stockData) });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); resetMonitorForm(); loadMonitorStocks(); } else alert(result.message || '操作失败');
+    } catch (error) { alert('保存失败，请检查网络连接'); }
+}
+function editMonitorStock(stock) {
+    editingMonitorStock = stock;
+    document.getElementById('monitor-code').value = stock.code;
+    document.getElementById('monitor-name').value = stock.name;
+    document.getElementById('monitor-timeframe').value = stock.timeframe;
+    document.getElementById('monitor-reasonable-pe-min').value = stock.reasonable_pe_min || 15;
+    document.getElementById('monitor-reasonable-pe-max').value = stock.reasonable_pe_max || 20;
+    document.getElementById('monitor-code').disabled = true;
+}
+async function deleteMonitorStock(code) {
+    if (!confirm(`确定删除监控股票 ${code} 吗？`)) return;
+    try {
+        const response = await fetch(`/api/admin/monitor-stocks/${code}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); loadMonitorStocks(); } else alert(result.message || '删除失败');
+    } catch (error) { alert('删除失败，请检查网络连接'); }
+}
+async function toggleMonitorStock(code, enabled) {
+    try {
+        const response = await fetch(`/api/admin/monitor-stocks/${code}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); loadMonitorStocks(); } else alert(result.message || '操作失败');
+    } catch (error) { alert('操作失败，请检查网络连接'); }
+}
+function resetMonitorForm() {
+    document.getElementById('monitor-form').reset();
+    document.getElementById('monitor-code').disabled = false;
+    editingMonitorStock = null;
+}
+
+async function loadXueqiuCubes() {
+    try {
+        const response = await fetch('/api/admin/xueqiu-cubes');
+        const result = await response.json();
+        const tbody = document.getElementById('xueqiu-table-body');
+        tbody.innerHTML = '';
+        const items = result.data || [];
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state">暂无雪球组合数据</td></tr>';
+        } else {
+            items.forEach(cube => {
+                const tr = document.createElement('tr');
+                const statusBadge = cube.enabled ? softBadge('启用', 'badge-success-soft') : softBadge('禁用', 'badge-gray-soft');
+                tr.innerHTML = `
+                    <td class="mono">${cube.cube_symbol}</td>
+                    <td><strong>${cube.cube_name}</strong></td>
+                    <td class="text-center">${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary me-2" onclick="editXueqiuCube(${JSON.stringify(cube).replace(/"/g, '&quot;')})">编辑</button>
+                        <button class="btn btn-sm btn-outline-${cube.enabled ? 'warning' : 'success'} me-2" onclick="toggleXueqiuCube('${cube.cube_symbol}', ${!cube.enabled})">${cube.enabled ? '禁用' : '启用'}</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteXueqiuCube('${cube.cube_symbol}')">删除</button>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
         }
-        
-        // 编辑股票
-        function editStock(stock) {
-            editingStock = stock;
-            
-            document.getElementById('form-title').textContent = '编辑股票';
-            document.getElementById('code').value = stock.code;
-            document.getElementById('name').value = stock.name;
-            document.getElementById('cost_price').value = stock.cost_price;
-            document.getElementById('shares').value = stock.shares;
-            
-            // 禁用代码字段编辑
-            document.getElementById('code').disabled = true;
-        }
-        
-        // 删除股票
-        async function deleteStock(code) {
-            if (!confirm(`确定要删除股票 ${code} 吗？此操作不可撤销。`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/admin/stocks/${code}`, {
-                    method: 'DELETE'
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    loadStocks();
-                } else {
-                    alert(result.message || '删除失败');
-                }
-            } catch (error) {
-                console.error("删除股票失败:", error);
-                alert('删除失败，请检查网络连接');
-            }
-        }
-        
-        // 重置表单
-        function resetForm() {
-            document.getElementById('stock-form').reset();
-            document.getElementById('form-title').textContent = '添加股票';
-            document.getElementById('code').disabled = false;
-            editingStock = null;
-        }
-        
-        // ========== 监控股票管理功能 ==========
-        
-        // 加载监控股票数据
-        async function loadMonitorStocks() {
-            try {
-                const response = await fetch('/api/admin/monitor-stocks');
-                const result = await response.json();
-                
-                const tbody = document.getElementById('monitor-table-body');
-                tbody.innerHTML = '';
-                
-                if (!result.data || result.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-muted">暂无监控股票数据</td></tr>';
-                    return;
-                }
-                
-                result.data.forEach(stock => {
-                    const tr = document.createElement('tr');
-                    const timeframeMap = {
-                        '1d': '日K线',
-                        '2d': '2日K线',
-                        '3d': '3日K线'
-                    };
-                    
-                    const statusBadge = stock.enabled ? 
-                        '<span class="badge bg-success">启用</span>' : 
-                        '<span class="badge bg-secondary">禁用</span>';
-                    
-                    const peRange = `${stock.reasonable_pe_min || 15} - ${stock.reasonable_pe_max || 20}`;
-                    
-                    tr.innerHTML = `
-                        <td>${stock.code}</td>
-                        <td>${stock.name}</td>
-                        <td class="text-center">${timeframeMap[stock.timeframe] || stock.timeframe}</td>
-                        <td class="text-end">${peRange}</td>
-                        <td class="text-center">${statusBadge}</td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary me-2" onclick="editMonitorStock(${JSON.stringify(stock).replace(/"/g, '&quot;')})">编辑</button>
-                            <button class="btn btn-sm btn-outline-${stock.enabled ? 'warning' : 'success'} me-2" onclick="toggleMonitorStock('${stock.code}', ${!stock.enabled})">${stock.enabled ? '禁用' : '启用'}</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteMonitorStock('${stock.code}')">删除</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) {
-                console.error("加载监控股票数据失败:", error);
-                document.getElementById('monitor-table-body').innerHTML = '<tr><td colspan="6" class="text-center text-danger p-4">加载数据失败</td></tr>';
-            }
-        }
-        
-        // 保存监控股票
-        async function saveMonitorStock(event) {
-            event.preventDefault();
-            
-            const code = document.getElementById('monitor-code').value.trim();
-            const name = document.getElementById('monitor-name').value.trim();
-            const timeframe = document.getElementById('monitor-timeframe').value;
-            const reasonablePeMin = document.getElementById('monitor-reasonable-pe-min').value;
-            const reasonablePeMax = document.getElementById('monitor-reasonable-pe-max').value;
-            
-            if (!code || !name || !timeframe || !reasonablePeMin || !reasonablePeMax) {
-                alert('请填写所有字段');
-                return;
-            }
-            
-            if (parseFloat(reasonablePeMin) >= parseFloat(reasonablePeMax)) {
-                alert('合理估值最小值必须小于最大值');
-                return;
-            }
-            
-            const stockData = {
-                code: code,
-                name: name,
-                timeframe: timeframe,
-                reasonable_pe_min: parseFloat(reasonablePeMin),
-                reasonable_pe_max: parseFloat(reasonablePeMax)
-            };
-            
-            let url, method;
-            if (editingMonitorStock) {
-                // 更新现有监控股票
-                url = `/api/admin/monitor-stocks/${editingMonitorStock.code}`;
-                method = 'PUT';
-                stockData.enabled = editingMonitorStock.enabled;
-            } else {
-                // 添加新监控股票
-                url = '/api/admin/monitor-stocks';
-                method = 'POST';
-            }
-            
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(stockData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    resetMonitorForm();
-                    loadMonitorStocks();
-                } else {
-                    alert(result.message || '操作失败');
-                }
-            } catch (error) {
-                console.error("保存监控股票失败:", error);
-                alert('保存失败，请检查网络连接');
-            }
-        }
-        
-        // 编辑监控股票
-        function editMonitorStock(stock) {
-            editingMonitorStock = stock;
-            
-            document.getElementById('monitor-code').value = stock.code;
-            document.getElementById('monitor-name').value = stock.name;
-            document.getElementById('monitor-timeframe').value = stock.timeframe;
-            document.getElementById('monitor-reasonable-pe-min').value = stock.reasonable_pe_min || 15;
-            document.getElementById('monitor-reasonable-pe-max').value = stock.reasonable_pe_max || 20;
-            
-            // 禁用代码字段编辑
-            document.getElementById('monitor-code').disabled = true;
-        }
-        
-        // 删除监控股票
-        async function deleteMonitorStock(code) {
-            if (!confirm(`确定要删除监控股票 ${code} 吗？此操作不可撤销。`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/admin/monitor-stocks/${code}`, {
-                    method: 'DELETE'
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    loadMonitorStocks();
-                } else {
-                    alert(result.message || '删除失败');
-                }
-            } catch (error) {
-                console.error("删除监控股票失败:", error);
-                alert('删除失败，请检查网络连接');
-            }
-        }
-        
-        // 启用/禁用监控股票
-        async function toggleMonitorStock(code, enabled) {
-            try {
-                const response = await fetch(`/api/admin/monitor-stocks/${code}/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ enabled: enabled })
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    loadMonitorStocks();
-                } else {
-                    alert(result.message || '操作失败');
-                }
-            } catch (error) {
-                console.error("切换监控股票状态失败:", error);
-                alert('操作失败，请检查网络连接');
-            }
-        }
-        
-        // 重置监控表单
-        function resetMonitorForm() {
-            document.getElementById('monitor-form').reset();
-            document.getElementById('monitor-code').disabled = false;
-            editingMonitorStock = null;
-        }
-        
-        // ========== 雪球组合管理功能 ==========
-        
-        let editingXueqiuCube = null;
-        
-        // 加载雪球组合数据
-        async function loadXueqiuCubes() {
-            try {
-                const response = await fetch('/api/admin/xueqiu-cubes');
-                const result = await response.json();
-                
-                const tbody = document.getElementById('xueqiu-table-body');
-                tbody.innerHTML = '';
-                
-                if (!result.data || result.data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-muted">暂无雪球组合数据</td></tr>';
-                    return;
-                }
-                
-                result.data.forEach(cube => {
-                    const tr = document.createElement('tr');
-                    
-                    const statusBadge = cube.enabled ? 
-                        '<span class="badge bg-success">启用</span>' : 
-                        '<span class="badge bg-secondary">禁用</span>';
-                    
-                    tr.innerHTML = `
-                        <td><code>${cube.cube_symbol}</code></td>
-                        <td>${cube.cube_name}</td>
-                        <td class="text-center">${statusBadge}</td>
-                        <td class="text-end">
-                            <button class="btn btn-sm btn-outline-primary me-2" onclick="editXueqiuCube(${JSON.stringify(cube).replace(/"/g, '&quot;')})">编辑</button>
-                            <button class="btn btn-sm btn-outline-${cube.enabled ? 'warning' : 'success'} me-2" onclick="toggleXueqiuCube('${cube.cube_symbol}', ${!cube.enabled})">${cube.enabled ? '禁用' : '启用'}</button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteXueqiuCube('${cube.cube_symbol}')">删除</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) {
-                console.error("加载雪球组合数据失败:", error);
-                document.getElementById('xueqiu-table-body').innerHTML = '<tr><td colspan="4" class="text-center text-danger p-4">加载数据失败</td></tr>';
-            }
-        }
-        
-        // 保存雪球组合
-        async function saveXueqiuCube(event) {
-            event.preventDefault();
-            
-            const cubeSymbol = document.getElementById('xueqiu-symbol').value.trim();
-            const cubeName = document.getElementById('xueqiu-name').value.trim();
-            const enabled = document.getElementById('xueqiu-enabled').value === 'true';
-            
-            if (!cubeSymbol || !cubeName) {
-                alert('请填写所有字段');
-                return;
-            }
-            
-            const cubeData = {
-                cube_symbol: cubeSymbol,
-                cube_name: cubeName,
-                enabled: enabled
-            };
-            
-            let url, method;
-            if (editingXueqiuCube) {
-                // 更新现有组合
-                url = `/api/admin/xueqiu-cubes/${editingXueqiuCube.cube_symbol}`;
-                method = 'PUT';
-            } else {
-                // 添加新组合
-                url = '/api/admin/xueqiu-cubes';
-                method = 'POST';
-            }
-            
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(cubeData)
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    resetXueqiuForm();
-                    loadXueqiuCubes();
-                } else {
-                    alert(result.message || '操作失败');
-                }
-            } catch (error) {
-                console.error("保存雪球组合失败:", error);
-                alert('保存失败，请检查网络连接');
-            }
-        }
-        
-        // 编辑雪球组合
-        function editXueqiuCube(cube) {
-            editingXueqiuCube = cube;
-            
-            document.getElementById('xueqiu-symbol').value = cube.cube_symbol;
-            document.getElementById('xueqiu-name').value = cube.cube_name;
-            document.getElementById('xueqiu-enabled').value = cube.enabled.toString();
-            
-            // 禁用代码字段编辑
-            document.getElementById('xueqiu-symbol').disabled = true;
-        }
-        
-        // 删除雪球组合
-        async function deleteXueqiuCube(cubeSymbol) {
-            if (!confirm(`确定要删除雪球组合 ${cubeSymbol} 吗？此操作不可撤销。`)) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/admin/xueqiu-cubes/${cubeSymbol}`, {
-                    method: 'DELETE'
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    loadXueqiuCubes();
-                } else {
-                    alert(result.message || '删除失败');
-                }
-            } catch (error) {
-                console.error("删除雪球组合失败:", error);
-                alert('删除失败，请检查网络连接');
-            }
-        }
-        
-        // 启用/禁用雪球组合
-        async function toggleXueqiuCube(cubeSymbol, enabled) {
-            try {
-                const response = await fetch(`/api/admin/xueqiu-cubes/${cubeSymbol}/toggle`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ enabled: enabled })
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert(result.message);
-                    loadXueqiuCubes();
-                } else {
-                    alert(result.message || '操作失败');
-                }
-            } catch (error) {
-                console.error("切换雪球组合状态失败:", error);
-                alert('操作失败，请检查网络连接');
-            }
-        }
-        
-        // 重置雪球组合表单
-        function resetXueqiuForm() {
-            document.getElementById('xueqiu-form').reset();
-            document.getElementById('xueqiu-symbol').disabled = false;
-            editingXueqiuCube = null;
-        }
-        
-        // 页面加载完成后自动执行
-        document.addEventListener('DOMContentLoaded', function() {
-            loadStocks();
-            loadMonitorStocks();
-            loadXueqiuCubes();
-            document.getElementById('stock-form').addEventListener('submit', saveStock);
-            document.getElementById('monitor-form').addEventListener('submit', saveMonitorStock);
-            document.getElementById('xueqiu-form').addEventListener('submit', saveXueqiuCube);
-        });
-    </script>
+        const stocks = Number(document.getElementById('metric-stocks').textContent) || 0;
+        const monitors = Number(document.getElementById('metric-monitors').textContent) || 0;
+        const enabledMonitors = Number(document.getElementById('metric-enabled-monitors').textContent) || 0;
+        updateMetrics({ stocks, monitors, enabledMonitors, cubes: items.length });
+    } catch (error) {
+        document.getElementById('xueqiu-table-body').innerHTML = '<tr><td colspan="4" class="empty-state text-danger">加载雪球组合失败</td></tr>';
+    }
+}
+async function saveXueqiuCube(event) {
+    event.preventDefault();
+    const cubeSymbol = document.getElementById('xueqiu-symbol').value.trim();
+    const cubeName = document.getElementById('xueqiu-name').value.trim();
+    const enabled = document.getElementById('xueqiu-enabled').value === 'true';
+    if (!cubeSymbol || !cubeName) return alert('请填写所有字段');
+    const cubeData = { cube_symbol: cubeSymbol, cube_name: cubeName, enabled };
+    const url = editingXueqiuCube ? `/api/admin/xueqiu-cubes/${editingXueqiuCube.cube_symbol}` : '/api/admin/xueqiu-cubes';
+    const method = editingXueqiuCube ? 'PUT' : 'POST';
+    try {
+        const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cubeData) });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); resetXueqiuForm(); loadXueqiuCubes(); } else alert(result.message || '操作失败');
+    } catch (error) { alert('保存失败，请检查网络连接'); }
+}
+function editXueqiuCube(cube) {
+    editingXueqiuCube = cube;
+    document.getElementById('xueqiu-symbol').value = cube.cube_symbol;
+    document.getElementById('xueqiu-name').value = cube.cube_name;
+    document.getElementById('xueqiu-enabled').value = cube.enabled.toString();
+    document.getElementById('xueqiu-symbol').disabled = true;
+}
+async function deleteXueqiuCube(cubeSymbol) {
+    if (!confirm(`确定删除雪球组合 ${cubeSymbol} 吗？`)) return;
+    try {
+        const response = await fetch(`/api/admin/xueqiu-cubes/${cubeSymbol}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); loadXueqiuCubes(); } else alert(result.message || '删除失败');
+    } catch (error) { alert('删除失败，请检查网络连接'); }
+}
+async function toggleXueqiuCube(cubeSymbol, enabled) {
+    try {
+        const response = await fetch(`/api/admin/xueqiu-cubes/${cubeSymbol}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
+        const result = await response.json();
+        if (result.status === 'success') { alert(result.message); loadXueqiuCubes(); } else alert(result.message || '操作失败');
+    } catch (error) { alert('操作失败，请检查网络连接'); }
+}
+function resetXueqiuForm() {
+    document.getElementById('xueqiu-form').reset();
+    document.getElementById('xueqiu-symbol').disabled = false;
+    editingXueqiuCube = null;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadStocks();
+    loadMonitorStocks();
+    loadXueqiuCubes();
+    document.getElementById('stock-form').addEventListener('submit', saveStock);
+    document.getElementById('monitor-form').addEventListener('submit', saveMonitorStock);
+    document.getElementById('xueqiu-form').addEventListener('submit', saveXueqiuCube);
+});
+</script>
 </body>
 </html>
