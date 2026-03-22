@@ -298,3 +298,43 @@ body {
   .hero-head, .section-title { align-items: stretch; }
   .hero-actions { width: 100%; justify-content: flex-start; }
 }
+.toast-stack {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+.toast-card {
+  min-width: 260px;
+  max-width: 360px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  color: #fff;
+  box-shadow: 0 16px 40px rgba(15,23,42,.18);
+  backdrop-filter: blur(12px);
+  transform: translateY(-8px);
+  opacity: 0;
+  transition: all .22s ease;
+}
+.toast-card.is-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+.toast-card.success { background: linear-gradient(135deg, rgba(22,163,74,.96), rgba(5,150,105,.96)); }
+.toast-card.error { background: linear-gradient(135deg, rgba(220,38,38,.96), rgba(239,68,68,.96)); }
+.toast-card.info { background: linear-gradient(135deg, rgba(37,99,235,.96), rgba(79,70,229,.96)); }
+.toast-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  margin-bottom: 4px;
+}
+.toast-message {
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(255,255,255,.92);
+}

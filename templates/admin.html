@@ -11,10 +11,7 @@
 <div class="app-shell">
     <section class="hero">
         <div class="hero-head">
-            <div class="hero-title">
-                <h1>数据管理后台</h1>
-                <p>把持仓、监控股票和雪球组合集中到同一个控制台，重点优化录入效率、信息对比和操作反馈。</p>
-            </div>
+            <div class="hero-title"><h1>数据管理后台</h1></div>
         </div>
         <div class="nav-pills-bar">
             <a class="nav-chip" href="/">组合</a>
@@ -37,12 +34,7 @@
 
     <section class="surface section">
         <div class="panel-card">
-            <div class="panel-card-header">
-                <div>
-                    <h4 id="form-title">持仓股票管理</h4>
-                    <p class="mb-0 text-muted small">管理投资组合中的基础持仓数据。</p>
-                </div>
-            </div>
+            <div class="panel-card-header"><div><h4 id="form-title">持仓股票管理</h4></div></div>
             <div class="panel-card-body">
                 <form id="stock-form" class="form-panel">
                     <div class="row g-3 align-items-end">
@@ -65,12 +57,7 @@
 
     <section class="surface section">
         <div class="panel-card">
-            <div class="panel-card-header">
-                <div>
-                    <h4>监控股票管理</h4>
-                    <p class="mb-0 text-muted small">定义周期和合理估值区间，为监控页提供分析基础。</p>
-                </div>
-            </div>
+            <div class="panel-card-header"><div><h4>监控股票管理</h4></div></div>
             <div class="panel-card-body">
                 <form id="monitor-form" class="form-panel">
                     <div class="row g-3 align-items-end">
@@ -94,12 +81,7 @@
 
     <section class="surface section">
         <div class="panel-card">
-            <div class="panel-card-header">
-                <div>
-                    <h4>雪球组合管理</h4>
-                    <p class="mb-0 text-muted small">维护组合 ID 与显示名称，并控制前台是否启用展示。</p>
-                </div>
-            </div>
+            <div class="panel-card-header"><div><h4>雪球组合管理</h4></div></div>
             <div class="panel-card-body">
                 <form id="xueqiu-form" class="form-panel">
                     <div class="row g-3 align-items-end">
@@ -167,6 +149,7 @@ async function loadStocks() {
         updateMetrics({ stocks: items.length, monitors: current, enabledMonitors: enabled, cubes });
     } catch (error) {
         document.getElementById('stocks-table-body').innerHTML = '<tr><td colspan="5" class="empty-state text-danger">加载持仓数据失败</td></tr>';
+        showToast('加载持仓数据失败', 'error');
     }
 }
 
@@ -176,15 +159,15 @@ async function saveStock(event) {
     const name = document.getElementById('name').value.trim();
     const costPrice = document.getElementById('cost_price').value;
     const shares = document.getElementById('shares').value;
-    if (!code || !name || !costPrice || !shares) return alert('请填写所有字段');
+    if (!code || !name || !costPrice || !shares) return showToast('请填写所有字段', 'info');
     const stockData = { code, name, cost_price: parseFloat(costPrice), shares: parseInt(shares) };
     const url = editingStock ? `/api/admin/stocks/${editingStock.code}` : '/api/admin/stocks';
     const method = editingStock ? 'PUT' : 'POST';
     try {
         const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stockData) });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); resetForm(); loadStocks(); } else alert(result.message || '操作失败');
-    } catch (error) { alert('保存失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); resetForm(); loadStocks(); } else showToast(result.message || '操作失败', 'error');
+    } catch (error) { showToast('保存失败，请检查网络连接', 'error'); }
 }
 function editStock(stock) {
     editingStock = stock;
@@ -200,8 +183,8 @@ async function deleteStock(code) {
     try {
         const response = await fetch(`/api/admin/stocks/${code}`, { method: 'DELETE' });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); loadStocks(); } else alert(result.message || '删除失败');
-    } catch (error) { alert('删除失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); loadStocks(); } else showToast(result.message || '删除失败', 'error');
+    } catch (error) { showToast('删除失败，请检查网络连接', 'error'); }
 }
 function resetForm() {
     document.getElementById('stock-form').reset();
@@ -243,6 +226,7 @@ async function loadMonitorStocks() {
         updateMetrics({ stocks, monitors: items.length, enabledMonitors: items.filter(item => item.enabled).length, cubes });
     } catch (error) {
         document.getElementById('monitor-table-body').innerHTML = '<tr><td colspan="6" class="empty-state text-danger">加载监控股票失败</td></tr>';
+        showToast('加载监控股票失败', 'error');
     }
 }
 async function saveMonitorStock(event) {
@@ -252,16 +236,16 @@ async function saveMonitorStock(event) {
     const timeframe = document.getElementById('monitor-timeframe').value;
     const reasonablePeMin = document.getElementById('monitor-reasonable-pe-min').value;
     const reasonablePeMax = document.getElementById('monitor-reasonable-pe-max').value;
-    if (!code || !name || !timeframe || !reasonablePeMin || !reasonablePeMax) return alert('请填写所有字段');
-    if (parseFloat(reasonablePeMin) >= parseFloat(reasonablePeMax)) return alert('PE 最小值必须小于最大值');
+    if (!code || !name || !timeframe || !reasonablePeMin || !reasonablePeMax) return showToast('请填写所有字段', 'info');
+    if (parseFloat(reasonablePeMin) >= parseFloat(reasonablePeMax)) return showToast('PE 最小值必须小于最大值', 'info');
     const stockData = { code, name, timeframe, reasonable_pe_min: parseFloat(reasonablePeMin), reasonable_pe_max: parseFloat(reasonablePeMax) };
     const url = editingMonitorStock ? `/api/admin/monitor-stocks/${editingMonitorStock.code}` : '/api/admin/monitor-stocks';
     const method = editingMonitorStock ? 'PUT' : 'POST';
     try {
         const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(stockData) });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); resetMonitorForm(); loadMonitorStocks(); } else alert(result.message || '操作失败');
-    } catch (error) { alert('保存失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); resetMonitorForm(); loadMonitorStocks(); } else showToast(result.message || '操作失败', 'error');
+    } catch (error) { showToast('保存失败，请检查网络连接', 'error'); }
 }
 function editMonitorStock(stock) {
     editingMonitorStock = stock;
@@ -277,15 +261,15 @@ async function deleteMonitorStock(code) {
     try {
         const response = await fetch(`/api/admin/monitor-stocks/${code}`, { method: 'DELETE' });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); loadMonitorStocks(); } else alert(result.message || '删除失败');
-    } catch (error) { alert('删除失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); loadMonitorStocks(); } else showToast(result.message || '删除失败', 'error');
+    } catch (error) { showToast('删除失败，请检查网络连接', 'error'); }
 }
 async function toggleMonitorStock(code, enabled) {
     try {
         const response = await fetch(`/api/admin/monitor-stocks/${code}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); loadMonitorStocks(); } else alert(result.message || '操作失败');
-    } catch (error) { alert('操作失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); loadMonitorStocks(); } else showToast(result.message || '操作失败', 'error');
+    } catch (error) { showToast('操作失败，请检查网络连接', 'error'); }
 }
 function resetMonitorForm() {
     document.getElementById('monitor-form').reset();
@@ -324,6 +308,7 @@ async function loadXueqiuCubes() {
         updateMetrics({ stocks, monitors, enabledMonitors, cubes: items.length });
     } catch (error) {
         document.getElementById('xueqiu-table-body').innerHTML = '<tr><td colspan="4" class="empty-state text-danger">加载雪球组合失败</td></tr>';
+        showToast('加载雪球组合失败', 'error');
     }
 }
 async function saveXueqiuCube(event) {
@@ -331,15 +316,15 @@ async function saveXueqiuCube(event) {
     const cubeSymbol = document.getElementById('xueqiu-symbol').value.trim();
     const cubeName = document.getElementById('xueqiu-name').value.trim();
     const enabled = document.getElementById('xueqiu-enabled').value === 'true';
-    if (!cubeSymbol || !cubeName) return alert('请填写所有字段');
+    if (!cubeSymbol || !cubeName) return showToast('请填写所有字段', 'info');
     const cubeData = { cube_symbol: cubeSymbol, cube_name: cubeName, enabled };
     const url = editingXueqiuCube ? `/api/admin/xueqiu-cubes/${editingXueqiuCube.cube_symbol}` : '/api/admin/xueqiu-cubes';
     const method = editingXueqiuCube ? 'PUT' : 'POST';
     try {
         const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cubeData) });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); resetXueqiuForm(); loadXueqiuCubes(); } else alert(result.message || '操作失败');
-    } catch (error) { alert('保存失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); resetXueqiuForm(); loadXueqiuCubes(); } else showToast(result.message || '操作失败', 'error');
+    } catch (error) { showToast('保存失败，请检查网络连接', 'error'); }
 }
 function editXueqiuCube(cube) {
     editingXueqiuCube = cube;
@@ -353,15 +338,15 @@ async function deleteXueqiuCube(cubeSymbol) {
     try {
         const response = await fetch(`/api/admin/xueqiu-cubes/${cubeSymbol}`, { method: 'DELETE' });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); loadXueqiuCubes(); } else alert(result.message || '删除失败');
-    } catch (error) { alert('删除失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); loadXueqiuCubes(); } else showToast(result.message || '删除失败', 'error');
+    } catch (error) { showToast('删除失败，请检查网络连接', 'error'); }
 }
 async function toggleXueqiuCube(cubeSymbol, enabled) {
     try {
         const response = await fetch(`/api/admin/xueqiu-cubes/${cubeSymbol}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled }) });
         const result = await response.json();
-        if (result.status === 'success') { alert(result.message); loadXueqiuCubes(); } else alert(result.message || '操作失败');
-    } catch (error) { alert('操作失败，请检查网络连接'); }
+        if (result.status === 'success') { showToast(result.message, 'success'); loadXueqiuCubes(); } else showToast(result.message || '操作失败', 'error');
+    } catch (error) { showToast('操作失败，请检查网络连接', 'error'); }
 }
 function resetXueqiuForm() {
     document.getElementById('xueqiu-form').reset();
@@ -378,5 +363,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('xueqiu-form').addEventListener('submit', saveXueqiuCube);
 });
 </script>
+<script src="/static/ui.js"></script>
 </body>
 </html>

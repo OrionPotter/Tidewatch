@@ -13,7 +13,6 @@
             <div class="hero-head">
                 <div class="hero-title">
                     <h1>加仓监控看板</h1>
-                    <p>结合估值区间、趋势与技术位，快速筛出更值得重点关注的交易机会。</p>
                 </div>
                 <div class="hero-actions">
                     <span class="last-update" id="update-time">等待更新</span>
@@ -31,14 +30,8 @@
             </div>
         </section>
 
-        
         <section class="surface section">
-            <div class="section-title">
-                <div>
-                    <h3>监控列表</h3>
-                    <p>绿色优先表示更值得关注，橙色和灰色表示等待或风险状态。</p>
-                </div>
-            </div>
+            <div class="section-title"><div><h3>监控列表</h3></div></div>
             <div class="table-wrap">
                 <table class="table-modern">
                     <thead>
@@ -143,6 +136,7 @@
             } catch (error) {
                 console.error(error);
                 tbody.innerHTML = '<tr><td colspan="11" class="empty-state text-danger">监控数据加载失败。</td></tr>';
+                showToast('监控数据加载失败', 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '刷新数据';
@@ -163,14 +157,16 @@
                     body: JSON.stringify({ force_update: false })
                 });
                 const result = await response.json();
-                alert(result.status === 'success' ? 'K 线更新任务已启动，请稍后刷新页面查看结果。' : `更新失败：${result.message}`);
+                if (result.status === 'success') showToast('K 线更新任务已启动，请稍后刷新页面查看结果。', 'success');
+                else showToast(`更新失败：${result.message}`, 'error');
             } catch (error) {
-                alert('更新失败，请检查网络连接。');
+                showToast('更新失败，请检查网络连接。', 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }
         });
     </script>
+    <script src="/static/ui.js"></script>
 </body>
 </html>
