@@ -1,9 +1,10 @@
 ﻿from fastapi import APIRouter, HTTPException
 
+from api.route_helpers import bool_status_response
 from repositories.portfolio_repository import StockRepository
 from schemas.portfolio import PortfolioStockCreate, PortfolioStockUpdate
 from services.portfolio_service import PortfolioService
-from utils.api_helpers import current_timestamp, status_message_response, success_response
+from utils.api_helpers import current_timestamp, success_response
 from utils.logger import get_logger
 
 logger = get_logger('portfolio_routes')
@@ -31,18 +32,18 @@ async def get_portfolio():
 async def create_stock(data: PortfolioStockCreate):
     logger.info(f'POST /api/portfolio {data.code}')
     success, msg = await StockRepository.add(data.code, data.name, data.cost_price, data.shares)
-    return status_message_response(success, msg)
+    return bool_status_response(success, msg, msg)
 
 
 @portfolio_router.put('/{code}')
 async def update_stock(code: str, data: PortfolioStockUpdate):
     logger.info(f'PUT /api/portfolio/{code}')
     success = await StockRepository.update(code, data.name, data.cost_price, data.shares)
-    return status_message_response(success, '更新成功', '更新失败')
+    return bool_status_response(success, '更新成功', '更新失败')
 
 
 @portfolio_router.delete('/{code}')
 async def delete_stock(code: str):
     logger.info(f'DELETE /api/portfolio/{code}')
     success = await StockRepository.delete(code)
-    return status_message_response(success, '删除成功', '删除失败')
+    return bool_status_response(success, '删除成功', '删除失败')

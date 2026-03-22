@@ -1,10 +1,11 @@
 ﻿import threading
 import time
 
+from api.route_helpers import bool_status_response, enrich_monitor_stocks
 from fastapi import APIRouter, HTTPException
 from schemas.monitor import MonitorStockCreate, MonitorStockUpdate, ToggleStock, UpdateKline
 from services.monitor_service import MonitorService
-from utils.api_helpers import current_timestamp, status_message_response, success_response
+from utils.api_helpers import current_timestamp, success_response
 from utils.logger import get_logger
 
 logger = get_logger('monitor_routes')
@@ -32,40 +33,7 @@ async def get_monitor():
             ):
                 return _monitor_cache['data']
 
-        stocks = await MonitorService.get_monitor_data()
-        for stock in stocks:
-            min_price, max_price = MonitorService.calculate_reasonable_price(
-                stock.get('eps_forecast'),
-                stock.get('reasonable_pe_min'),
-                stock.get('reasonable_pe_max'),
-            )
-            stock['reasonable_price_min'] = min_price
-            stock['reasonable_price_max'] = max_price
-            stock['valuation_status'] = MonitorService.check_valuation_status(
-                stock.get('current_price'),
-                stock.get('eps_forecast'),
-                stock.get('reasonable_pe_min'),
-                stock.get('reasonable_pe_max'),
-            )
-            stock['technical_status'] = MonitorService.check_technical_status(
-                stock.get('current_price'),
-                stock.get('ema144'),
-                stock.get('ema188'),
-            )
-            stock['trend'] = MonitorService.check_trend(
-                {
-                    'ema5': stock.get('ema5'),
-                    'ema10': stock.get('ema10'),
-                    'ema20': stock.get('ema20'),
-                    'ema30': stock.get('ema30'),
-                    'ema60': stock.get('ema60'),
-                    'ema7': stock.get('ema7'),
-                    'ema21': stock.get('ema21'),
-                    'ema42': stock.get('ema42'),
-                },
-                stock.get('timeframe'),
-            )
-
+        stocks = enrich_monitor_stocks(await MonitorService.get_monitor_data())
         result = success_response(timestamp=current_timestamp(), stocks=stocks, clean_nan=True)
         with _monitor_cache['lock']:
             _monitor_cache['data'] = result
@@ -94,7 +62,7 @@ async def create_monitor_stock(data: MonitorStockCreate):
         data.reasonable_pe_min,
         data.reasonable_pe_max,
     )
-    return status_message_response(success, msg)
+    return bool_status_response(success, msg, msg)
 
 
 @monitor_router.put('/stocks/{code}')
@@ -106,19 +74,19 @@ async def update_monitor_stock(code: str, data: MonitorStockUpdate):
         data.reasonable_pe_min,
         data.reasonable_pe_max,
     )
-    return status_message_response(success, msg)
+    return bool_status_response(success, msg, msg)
 
 
 @monitor_router.delete('/stocks/{code}')
 async def delete_monitor_stock(code: str):
     success, msg = await MonitorService.delete_monitor_stock(code)
-    return status_message_response(success, msg)
+    return bool_status_response(success, msg, msg)
 
 
 @monitor_router.post('/stocks/{code}/toggle')
 async def toggle_monitor_stock(code: str, data: ToggleStock):
     success, msg = await MonitorService.toggle_monitor_stock(code, data.enabled)
-    return status_message_response(success, msg)
+    return bool_status_response(success, msg, msg)
 
 
 @monitor_router.post('/update-kline')
