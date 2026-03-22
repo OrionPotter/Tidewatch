@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 
 from api.admin_routes import admin_router
-from api.industry_board_routes import industry_board_router
 from api.monitor_routes import monitor_router
 from api.portfolio_routes import portfolio_router
 from api.stock_list_routes import stock_list_router
@@ -15,7 +14,6 @@ ROUTERS = (
     (tools_router, '/api/tools', 'tools'),
     (xueqiu_router, '/api/xueqiu', 'xueqiu'),
     (stock_list_router, '/api/stock-list', 'stock-list'),
-    (industry_board_router, '/api/industry-board', 'industry-board'),
 )
 
 
