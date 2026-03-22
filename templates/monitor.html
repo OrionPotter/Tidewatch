@@ -1,284 +1,177 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>加仓区域监控</title>
+    <title>监控看板 · Tidewatch</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; padding-top: 30px; }
-        .main-container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .text-end { text-align: right !important; }
-        thead th {
-            background-color: #e9ecef;
-            font-weight: 600;
-        }
-        .in-zone {
-            background-color: #d4edda !important;
-            color: #155724;
-        }
-        .out-zone {
-            background-color: #f8d7da !important;
-            color: #721c24;
-        }
-        .table-success {
-            background-color: #d4edda !important;
-        }
-        .badge-timeframe {
-            font-size: 0.75em;
-            padding: 0.25em 0.5em;
-        }
-    </style>
+    <link href="/static/styles.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container main-container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2 class="mb-0">📊 加仓区域监控</h2>
-                <div class="d-flex align-items-center">
-                    <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
-                    <a href="/tools" class="btn btn-outline-secondary me-2">🛠️ 投资工具</a>
-                    <a href="/industry-board" class="btn btn-outline-secondary me-2">🏭 行业板块</a>
-                    <a href="/xueqiu" class="btn btn-outline-secondary me-2">🏔️ 雪球监控</a>
-                    <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
-                    <small class="text-muted me-3" id="update-time"></small>
-                    <button id="update-kline-btn" class="btn btn-warning me-2" title="更新K线数据">
-                        📈 更新K线
-                    </button>
-                    <button id="refresh-btn" class="btn btn-primary">
-                        🔄 刷新数据
-                    </button>
+    <div class="app-shell">
+        <section class="hero">
+            <div class="hero-head">
+                <div class="hero-title">
+                    <h1>加仓监控看板</h1>
+                    <p>结合估值区间、趋势与技术位，快速筛出更值得重点关注的交易机会。</p>
                 </div>
-            </div>        
-        <div class="alert alert-info">
-            <strong>监控说明：</strong>当股票基本面处于低估,技术面加仓表示是一个比较合适的加仓机会。
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>名称</th>
-                        <th class="text-end">实时价格</th>
-                        <th class="text-end">合理估值(PE)</th>
-                        <th class="text-end">EPS预测</th>
-                        <th class="text-end">合理价格</th>
-                        <th class="text-center">估值状态</th>
-                        <th class="text-center">时间维度</th>
-                        <th class="text-center">趋势</th>
-                        <th class="text-end">进场1</th>
-                        <th class="text-end">进场2</th>
-                        <th class="text-center">技术状态</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body">
-                    <tr><td colspan="11" class="text-center p-4 text-muted">
-                        <div class="spinner-border spinner-border-sm" role="status">
-                            <span class="visually-hidden">加载中...</span>
-                        </div>
-                        <span class="ms-2">正在加载数据，请稍候...</span>
-                    </td></tr>
-                </tbody>
-            </table>
-        </div>
+                <div class="hero-actions">
+                    <span class="last-update" id="update-time">等待更新</span>
+                    <button id="update-kline-btn" class="btn btn-warning">更新 K 线</button>
+                    <button id="refresh-btn" class="btn btn-primary">刷新数据</button>
+                </div>
+            </div>
+            <div class="nav-pills-bar">
+                <a class="nav-chip" href="/">组合</a>
+                <a class="nav-chip is-active" href="/monitor">监控</a>
+                <a class="nav-chip" href="/tools">工具</a>
+                <a class="nav-chip" href="/industry-board">行业板块</a>
+                <a class="nav-chip" href="/xueqiu">雪球组合</a>
+                <a class="nav-chip" href="/admin">数据管理</a>
+            </div>
+        </section>
+
+        <section class="surface section">
+            <div class="alert-soft">
+                设计优化重点：把“估值状态 / 趋势 / 技术位”拆成更易扫描的状态标签，并通过色彩引导注意力，而不是让用户只盯表格数字。
+            </div>
+        </section>
+
+        <section class="surface section">
+            <div class="section-title">
+                <div>
+                    <h3>监控列表</h3>
+                    <p>绿色优先表示更值得关注，橙色和灰色表示等待或风险状态。</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>股票</th>
+                            <th class="text-end">现价</th>
+                            <th class="text-end">估值 PE</th>
+                            <th class="text-end">EPS 预测</th>
+                            <th class="text-end">合理价格</th>
+                            <th class="text-center">估值状态</th>
+                            <th class="text-center">周期</th>
+                            <th class="text-center">趋势</th>
+                            <th class="text-end">进场位 1</th>
+                            <th class="text-end">进场位 2</th>
+                            <th class="text-center">技术状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <tr><td colspan="11" class="empty-state">正在加载监控数据...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script>
-        // 工具函数：格式化数字为金额字符串
         function formatMoney(num) {
-            if (num === undefined || num === null) return '-';
+            if (num === undefined || num === null || Number.isNaN(num)) return '-';
             return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
-        
-        // 核心函数：从 API 获取数据并更新页面
+
+        function badge(text, tone) {
+            return `<span class="badge-soft ${tone}">${text}</span>`;
+        }
+
+        function getTrendBadge(stock) {
+            if (stock.timeframe === '1d' && stock.ema5 && stock.ema10 && stock.ema20) {
+                if (stock.ema5 > stock.ema10 && stock.ema10 > stock.ema20) return badge('多头', 'badge-success-soft');
+                if (stock.ema5 < stock.ema10 && stock.ema10 < stock.ema20) return badge('空头', 'badge-danger-soft');
+                return badge('震荡', 'badge-gray-soft');
+            }
+            if (stock.timeframe === '2d' && stock.ema10 && stock.ema30 && stock.ema60) {
+                if (stock.ema10 > stock.ema30 && stock.ema30 > stock.ema60) return badge('多头', 'badge-success-soft');
+                if (stock.ema10 < stock.ema30 && stock.ema30 < stock.ema60) return badge('空头', 'badge-danger-soft');
+                return badge('震荡', 'badge-gray-soft');
+            }
+            if (stock.timeframe === '3d' && stock.ema7 && stock.ema21 && stock.ema42) {
+                if (stock.ema7 > stock.ema21 && stock.ema21 > stock.ema42) return badge('多头', 'badge-success-soft');
+                if (stock.ema7 < stock.ema21 && stock.ema21 < stock.ema42) return badge('空头', 'badge-danger-soft');
+                return badge('震荡', 'badge-gray-soft');
+            }
+            return badge('未知', 'badge-gray-soft');
+        }
+
         async function loadData() {
             const btn = document.getElementById('refresh-btn');
             const tbody = document.getElementById('table-body');
-            const timeLabel = document.getElementById('update-time');
-            
-            // 设置按钮加载状态
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 加载中...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 加载中';
 
             try {
-                // 发起 API 请求
                 const response = await fetch('/api/monitor');
                 const data = await response.json();
+                if (data.status !== 'success') throw new Error('加载失败');
 
-                if (data.status === 'success') {
-                    // 清空现有的表格内容
-                    tbody.innerHTML = '';
-                    
-                    // 遍历监控数据，生成表格行
-                    data.stocks.forEach(stock => {
-                        const tr = document.createElement('tr');
-                        
-                        // 判断是否在加仓区域
-                        const inZone = stock.current_price >= Math.min(stock.ema144, stock.ema188) && 
-                                      stock.current_price <= Math.max(stock.ema144, stock.ema188);
-                        
-                        // 时间维度显示
-                        const timeframeMap = {
-                            '1d': '日K线',
-                            '2d': '2日K线',
-                            '3d': '3日K线'
-                        };
-                        
-                        let statusBadge;
-                                                if (stock.current_price < Math.min(stock.ema144, stock.ema188)) {
-                                                    statusBadge = '<span class="badge bg-warning">破位</span>';
-                                                } else if (inZone) {
-                                                    statusBadge = '<span class="badge bg-success">加仓</span>';
-                                                } else {
-                                                    statusBadge = '<span class="badge bg-danger">无信号</span>';
-                                                }                        
-                        tr.className = inZone ? 'in-zone' : 'out-zone';
-                        
-                        // 格式化EPS预测显示
-                        const epsDisplay = stock.eps_forecast ? 
-                            `<span class="text-success">${formatMoney(stock.eps_forecast)}</span>` : 
-                            '<span class="text-muted">-</span>';
-                        
-                        // 格式化合理价格显示，并判断当前价格是否合理
-                        let reasonablePriceDisplay = '<span class="text-muted">-</span>';
-                        let priceClass = '';
-                        
-                        // 判断估值状态
-                        let valuationStatus = '<span class="text-muted">-</span>';
-                        let valuationClass = '';
-                        
-                        if (stock.eps_forecast && stock.reasonable_pe_min && stock.reasonable_pe_max) {
-                            const minReasonablePrice = stock.eps_forecast * stock.reasonable_pe_min;
-                            const maxReasonablePrice = stock.eps_forecast * stock.reasonable_pe_max;
-                            
-                            // 合理价格使用最小值计算
-                            stock.reasonable_price = minReasonablePrice;
-                            
-                            if (stock.current_price < minReasonablePrice) {
-                                reasonablePriceDisplay = `<span class="text-primary">${formatMoney(minReasonablePrice)}</span>`;
-                                valuationStatus = '<span class="badge bg-success">低估</span>';
-                                valuationClass = 'table-success'; // 低估状态
-                            } else if (stock.current_price > maxReasonablePrice) {
-                                reasonablePriceDisplay = `<span class="text-warning">${formatMoney(minReasonablePrice)}</span>`;
-                                valuationStatus = '<span class="badge bg-danger">高估</span>';
-                                valuationClass = ''; // 高估状态
-                            } else {
-                                reasonablePriceDisplay = `<span class="text-muted">${formatMoney(minReasonablePrice)}</span>`;
-                                valuationStatus = '<span class="badge bg-secondary">正常</span>';
-                                valuationClass = ''; // 正常状态
-                            }
-                        }
-                        
-                        tr.className = inZone ? `in-zone ${valuationClass}` : `out-zone ${valuationClass}`;
-                        
-                        // 趋势判断逻辑
-                        let trendBadge = '<span class="text-muted">-</span>';
-                        if (stock.ema5 && stock.ema10 && stock.ema20 && stock.timeframe === '1d') {
-                            // 日K线：EMA5 > EMA10 > EMA20 → 多头
-                            if (stock.ema5 > stock.ema10 && stock.ema10 > stock.ema20) {
-                                trendBadge = '<span class="badge bg-success">多头</span>';
-                            } else if (stock.ema5 < stock.ema10 && stock.ema10 < stock.ema20) {
-                                // EMA5 < EMA10 < EMA20 → 空头
-                                trendBadge = '<span class="badge bg-danger">空头</span>';
-                            } else {
-                                // 否则震荡
-                                trendBadge = '<span class="badge bg-secondary">震荡</span>';
-                            }
-                        } else if (stock.ema10 && stock.ema30 && stock.ema60 && stock.timeframe === '2d') {
-                            // 2日K线：EMA10 > EMA30 > EMA60 → 多头
-                            if (stock.ema10 > stock.ema30 && stock.ema30 > stock.ema60) {
-                                trendBadge = '<span class="badge bg-success">多头</span>';
-                            } else if (stock.ema10 < stock.ema30 && stock.ema30 < stock.ema60) {
-                                // EMA10 < EMA30 < EMA60 → 空头
-                                trendBadge = '<span class="badge bg-danger">空头</span>';
-                            } else {
-                                // 否则震荡
-                                trendBadge = '<span class="badge bg-secondary">震荡</span>';
-                            }
-                        } else if (stock.ema7 && stock.ema21 && stock.ema42 && stock.timeframe === '3d') {
-                            // 3日K线：EMA7 > EMA21 > EMA42 → 多头
-                            if (stock.ema7 > stock.ema21 && stock.ema21 > stock.ema42) {
-                                trendBadge = '<span class="badge bg-success">多头</span>';
-                            } else if (stock.ema7 < stock.ema21 && stock.ema21 < stock.ema42) {
-                                // EMA7 < EMA21 < EMA42 → 空头
-                                trendBadge = '<span class="badge bg-danger">空头</span>';
-                            } else {
-                                // 否则震荡
-                                trendBadge = '<span class="badge bg-secondary">震荡</span>';
-                            }
-                        }
-                        
-                        tr.innerHTML = `
-                            <td><strong>${stock.name}</strong> <small class="text-muted">(${stock.code})</small></td>
-                            <td class="text-end font-monospace">${formatMoney(stock.current_price)}</td>
-                            <td class="text-end font-monospace">${stock.reasonable_pe_min || 15} - ${stock.reasonable_pe_max || 20}</td>
-                            <td class="text-end font-monospace">${epsDisplay}</td>
-                            <td class="text-end font-monospace">${reasonablePriceDisplay}</td>
-                            <td class="text-center">${valuationStatus}</td>
-                            <td class="text-center">
-                                <span class="badge bg-secondary badge-timeframe">${timeframeMap[stock.timeframe] || stock.timeframe}</span>
-                            </td>
-                            <td class="text-center">${trendBadge}</td>
-                            <td class="text-end font-monospace">${formatMoney(stock.ema144)}</td>
-                            <td class="text-end font-monospace">${formatMoney(stock.ema188)}</td>
-                            <td class="text-center">${statusBadge}</td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
-                    
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger p-4">数据加载失败</td></tr>';
-                }
+                const timeframeMap = { '1d': '日线', '2d': '2日线', '3d': '3日线' };
+                tbody.innerHTML = '';
+
+                data.stocks.forEach(stock => {
+                    const valuationBadge = stock.valuation_status === '低估'
+                        ? badge('低估', 'badge-success-soft')
+                        : stock.valuation_status === '高估'
+                            ? badge('高估', 'badge-danger-soft')
+                            : stock.valuation_status === '正常'
+                                ? badge('正常', 'badge-gray-soft')
+                                : badge('未知', 'badge-gray-soft');
+
+                    const technicalBadge = stock.technical_status === '加仓'
+                        ? badge('加仓', 'badge-success-soft')
+                        : stock.technical_status === '破位'
+                            ? badge('破位', 'badge-warning-soft')
+                            : badge('无信号', 'badge-gray-soft');
+
+                    const minPrice = stock.eps_forecast ? stock.eps_forecast * (stock.reasonable_pe_min || 15) : null;
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${stock.name}</strong><div class="text-muted small">${stock.code}</div></td>
+                        <td class="text-end mono">${formatMoney(stock.current_price)}</td>
+                        <td class="text-end mono">${stock.reasonable_pe_min || 15} - ${stock.reasonable_pe_max || 20}</td>
+                        <td class="text-end mono">${stock.eps_forecast ? formatMoney(stock.eps_forecast) : '-'}</td>
+                        <td class="text-end mono">${minPrice ? formatMoney(minPrice) : '-'}</td>
+                        <td class="text-center">${valuationBadge}</td>
+                        <td class="text-center">${badge(timeframeMap[stock.timeframe] || stock.timeframe, 'badge-primary-soft')}</td>
+                        <td class="text-center">${getTrendBadge(stock)}</td>
+                        <td class="text-end mono">${formatMoney(stock.ema144)}</td>
+                        <td class="text-end mono">${formatMoney(stock.ema188)}</td>
+                        <td class="text-center">${technicalBadge}</td>`;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('update-time').textContent = `最后更新：${data.timestamp}`;
             } catch (error) {
-                console.error("Error:", error);
-                tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger p-4">网络请求错误，请检查连接。</td></tr>';
+                console.error(error);
+                tbody.innerHTML = '<tr><td colspan="11" class="empty-state text-danger">监控数据加载失败。</td></tr>';
             } finally {
-                // 恢复按钮状态
                 btn.disabled = false;
-                btn.innerHTML = '🔄 刷新数据';
+                btn.innerHTML = '刷新数据';
             }
         }
 
-        // 页面加载完成后自动执行一次数据加载
         document.addEventListener('DOMContentLoaded', loadData);
-        
-        // 绑定刷新按钮的点击事件
         document.getElementById('refresh-btn').addEventListener('click', loadData);
-        
-        // 绑定K线数据更新按钮的点击事件
-        document.getElementById('update-kline-btn').addEventListener('click', async function() {
+        document.getElementById('update-kline-btn').addEventListener('click', async function () {
             const btn = this;
             const originalText = btn.innerHTML;
-            
-            // 禁用按钮并显示加载状态
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 更新中...';
-            
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 更新中';
             try {
                 const response = await fetch('/api/monitor/update-kline', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ force_update: false })
                 });
-                
                 const result = await response.json();
-                
-                if (result.status === 'success') {
-                    alert('K线数据更新任务已启动，请稍后刷新页面查看结果');
-                } else {
-                    alert('更新失败: ' + result.message);
-                }
+                alert(result.status === 'success' ? 'K 线更新任务已启动，请稍后刷新页面查看结果。' : `更新失败：${result.message}`);
             } catch (error) {
-                console.error('更新K线数据失败:', error);
-                alert('更新失败，请检查网络连接');
+                alert('更新失败，请检查网络连接。');
             } finally {
-                // 恢复按钮状态
                 btn.disabled = false;
                 btn.innerHTML = originalText;
             }

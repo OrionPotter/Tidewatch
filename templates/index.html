@@ -1,167 +1,175 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>股票投资组合</title>
+    <title>投资组合 · Tidewatch</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; padding-top: 30px; }
-        .main-container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        /* 数字列右对齐 */
-        .text-end { text-align: right !important; }
-        /* 表头样式 */
-        thead th {
-            background-color: #e9ecef;
-            font-weight: 600;
-        }
-        /* 总计行样式 */
-        .summary-row {
-            background-color: #f1f3f5 !important;
-            font-weight: bold;
-            font-size: 1.05em;
-        }
-        /* 盈亏颜色类 */
-        .text-profit-up { color: #d9534f; } /* 红色代表盈利 (A股习惯) */
-        .text-profit-down { color: #5cb85c; } /* 绿色代表亏损 */
-    </style>
+    <link href="/static/styles.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container main-container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">📈 股票投资组合</h2>
-            <div class="d-flex align-items-center">
-                <a href="/tools" class="btn btn-outline-secondary me-2">🛠️ 投资工具</a>
-                <a href="/monitor" class="btn btn-outline-secondary me-2">📊 加仓监控</a>
-                <a href="/industry-board" class="btn btn-outline-secondary me-2">🏭 行业板块</a>
-                <a href="/xueqiu" class="btn btn-outline-secondary me-2">🏔️ 雪球监控</a>
-                <a href="/admin" class="btn btn-outline-secondary me-2">⚙️ 数据管理</a>
-                <small class="text-muted me-3" id="update-time"></small>
-                <button id="refresh-btn" class="btn btn-primary">
-                    🔄 刷新数据
-                </button>
+    <div class="app-shell">
+        <section class="hero">
+            <div class="hero-head">
+                <div class="hero-title">
+                    <h1>投资组合总览</h1>
+                    <p>聚焦持仓表现、股息回报与收益变化，用更清晰的视觉层级帮助你快速判断组合状态。</p>
+                </div>
+                <div class="hero-actions">
+                    <span class="last-update" id="update-time">等待更新</span>
+                    <button id="refresh-btn" class="btn btn-primary">刷新数据</button>
+                </div>
             </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>名称</th>
-                        <th class="text-end">实时价格</th>
-                        <th class="text-end">成本价格</th>
-                        <th class="text-end">持仓股数</th>
-                        <th class="text-end">总市值</th>
-                        <th class="text-end">盈亏</th>
-                        <th class="text-end">每股分红</th>
-                        <th class="text-end">股息率</th>
-                        <th class="text-end">每年分红金额</th>
-                    </tr>
-                </thead>
-                <tbody id="table-body">
-                    <tr><td colspan="9" class="text-center p-4 text-muted">正在加载数据，请稍候...</td></tr>
-                </tbody>
-                <tfoot>
-                    <tr class="summary-row">
-                        <td>总计</td>
-                        <td></td><td></td><td></td>
-                        <td class="text-end" id="sum-market-value">-</td>
-                        <td class="text-end" id="sum-profit">-</td>
-                        <td></td>
-                        <td class="text-end" id="sum-dividend-yield">-</td>
-                        <td class="text-end" id="sum-annual-dividend">-</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
+            <div class="nav-pills-bar">
+                <a class="nav-chip is-active" href="/">组合</a>
+                <a class="nav-chip" href="/monitor">监控</a>
+                <a class="nav-chip" href="/tools">工具</a>
+                <a class="nav-chip" href="/industry-board">行业板块</a>
+                <a class="nav-chip" href="/xueqiu">雪球组合</a>
+                <a class="nav-chip" href="/admin">数据管理</a>
+            </div>
+        </section>
+
+        <section class="surface section">
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">总市值</div>
+                    <div class="metric-value mono" id="sum-market-value-card">-</div>
+                    <div class="metric-sub">当前持仓总价值</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">累计盈亏</div>
+                    <div class="metric-value mono" id="sum-profit-card">-</div>
+                    <div class="metric-sub">按最新价格估算</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">股息率</div>
+                    <div class="metric-value mono" id="sum-dividend-yield-card">-</div>
+                    <div class="metric-sub">年化股息 / 总市值</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">年度股息</div>
+                    <div class="metric-value mono" id="sum-annual-dividend-card">-</div>
+                    <div class="metric-sub">按当前持仓测算</div>
+                </div>
+            </div>
+
+            <div class="section-title">
+                <div>
+                    <h3>持仓明细</h3>
+                    <p>表格按投资视角优化了数字对齐、重点信息和盈亏状态对比。</p>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>股票</th>
+                            <th class="text-end">现价</th>
+                            <th class="text-end">成本</th>
+                            <th class="text-end">持股数</th>
+                            <th class="text-end">市值</th>
+                            <th class="text-end">盈亏</th>
+                            <th class="text-end">每股分红</th>
+                            <th class="text-end">股息率</th>
+                            <th class="text-end">年度股息</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <tr><td colspan="9" class="empty-state">正在加载数据...</td></tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td>总计</td>
+                            <td></td>
+                            <td></td>
+                            <td></td>
+                            <td class="text-end mono" id="sum-market-value">-</td>
+                            <td class="text-end mono" id="sum-profit">-</td>
+                            <td></td>
+                            <td class="text-end mono" id="sum-dividend-yield">-</td>
+                            <td class="text-end mono" id="sum-annual-dividend">-</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script>
-        // 工具函数：格式化数字为金额字符串 (例: 12,345.67)
         function formatMoney(num) {
-            if (num === undefined || num === null) return '-';
+            if (num === undefined || num === null || Number.isNaN(num)) return '-';
             return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
-        
-        // 工具函数：格式化百分比
+
         function formatPercent(num) {
-             if (num === undefined || num === null || isNaN(num)) return '-';
-             return num.toFixed(2) + '%';
+            if (num === undefined || num === null || Number.isNaN(num)) return '-';
+            return `${num.toFixed(2)}%`;
         }
 
-        // 核心函数：从 API 获取数据并更新页面
+        function setValue(id, value) {
+            document.getElementById(id).textContent = value;
+        }
+
+        function setProfitStyle(element, value) {
+            element.classList.remove('status-positive', 'status-negative', 'status-neutral');
+            if (value > 0) element.classList.add('status-positive');
+            else if (value < 0) element.classList.add('status-negative');
+            else element.classList.add('status-neutral');
+        }
+
         async function loadData() {
             const btn = document.getElementById('refresh-btn');
             const tbody = document.getElementById('table-body');
-            const timeLabel = document.getElementById('update-time');
-            
-            // 设置按钮加载状态
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 加载中...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 加载中';
 
             try {
-                // 发起 API 请求
                 const response = await fetch('/api/portfolio');
                 const data = await response.json();
 
-                if (data.status === 'success') {
-                    // 1. 清空现有的表格内容
-                    tbody.innerHTML = '';
-                    
-                    // 2. 遍历明细数据，生成表格行
-                    data.rows.forEach(row => {
-                        // 判断盈亏颜色
-                        const profitClass = row.profit >= 0 ? 'text-profit-up' : 'text-profit-down';
-                        
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td><strong>${row.name}</strong> <small class="text-muted">(${row.code})</small></td>
-                            <td class="text-end font-monospace">${formatMoney(row.current_price)}</td>
-                            <td class="text-end font-monospace">${formatMoney(row.cost_price)}</td>
-                            <td class="text-end font-monospace">${row.shares.toLocaleString()}</td>
-                            <td class="text-end font-monospace fw-bold">${formatMoney(row.market_value)}</td>
-                            <td class="text-end font-monospace fw-bold ${profitClass}">${formatMoney(row.profit)}</td>
-                            <td class="text-end font-monospace">${formatMoney(row.dividend_per_share)}</td>
-                            <td class="text-end font-monospace">${formatPercent(row.dividend_yield)}</td>
-                            <td class="text-end font-monospace">${formatMoney(row.annual_dividend_income)}</td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
+                if (data.status !== 'success') throw new Error('加载失败');
 
-                    // 3. 更新底部总计行
-                    document.getElementById('sum-market-value').textContent = formatMoney(data.summary.market_value);
-                    const sumProfitElem = document.getElementById('sum-profit');
-                    sumProfitElem.textContent = formatMoney(data.summary.profit);
-                    // 设置总计盈亏的颜色
-                    sumProfitElem.className = 'text-end ' + (data.summary.profit >= 0 ? 'text-profit-up' : 'text-profit-down');
-                    document.getElementById('sum-dividend-yield').textContent = formatPercent(data.summary.dividend_yield);
-                    document.getElementById('sum-annual-dividend').textContent = formatMoney(data.summary.annual_dividend);
-                    
-                    // 更新时间标签
-                    timeLabel.textContent = '最后更新: ' + data.timestamp;
+                tbody.innerHTML = '';
+                data.rows.forEach(row => {
+                    const profitClass = row.profit > 0 ? 'status-positive' : row.profit < 0 ? 'status-negative' : 'status-neutral';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${row.name}</strong><div class="text-muted small">${row.code}</div></td>
+                        <td class="text-end mono">${formatMoney(row.current_price)}</td>
+                        <td class="text-end mono">${formatMoney(row.cost_price)}</td>
+                        <td class="text-end mono">${row.shares.toLocaleString()}</td>
+                        <td class="text-end mono fw-bold">${formatMoney(row.market_value)}</td>
+                        <td class="text-end mono fw-bold ${profitClass}">${formatMoney(row.profit)}</td>
+                        <td class="text-end mono">${formatMoney(row.dividend_per_share)}</td>
+                        <td class="text-end mono">${formatPercent(row.dividend_yield)}</td>
+                        <td class="text-end mono">${formatMoney(row.annual_dividend_income)}</td>`;
+                    tbody.appendChild(tr);
+                });
 
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger p-4">数据加载失败</td></tr>';
-                }
+                setValue('sum-market-value', formatMoney(data.summary.market_value));
+                setValue('sum-profit', formatMoney(data.summary.profit));
+                setValue('sum-dividend-yield', formatPercent(data.summary.dividend_yield));
+                setValue('sum-annual-dividend', formatMoney(data.summary.annual_dividend));
+                setValue('sum-market-value-card', formatMoney(data.summary.market_value));
+                setValue('sum-profit-card', formatMoney(data.summary.profit));
+                setValue('sum-dividend-yield-card', formatPercent(data.summary.dividend_yield));
+                setValue('sum-annual-dividend-card', formatMoney(data.summary.annual_dividend));
+                document.getElementById('update-time').textContent = `最后更新：${data.timestamp}`;
+
+                setProfitStyle(document.getElementById('sum-profit'), data.summary.profit);
+                setProfitStyle(document.getElementById('sum-profit-card'), data.summary.profit);
             } catch (error) {
-                console.error("Error:", error);
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger p-4">网络请求错误，请检查连接。</td></tr>';
+                console.error(error);
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state text-danger">数据加载失败，请稍后重试。</td></tr>';
             } finally {
-                // 恢复按钮状态
                 btn.disabled = false;
-                btn.innerHTML = '🔄 刷新数据';
+                btn.innerHTML = '刷新数据';
             }
         }
 
-        // 页面加载完成后自动执行一次数据加载
         document.addEventListener('DOMContentLoaded', loadData);
-        
-        // 绑定刷新按钮的点击事件
         document.getElementById('refresh-btn').addEventListener('click', loadData);
     </script>
 </body>

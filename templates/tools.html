@@ -1,453 +1,107 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>投资工具</title>
+    <title>投资工具 · Tidewatch</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; padding-top: 30px; }
-        .main-container {
-            background-color: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .tool-card {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .position-row {
-            background-color: #f8f9fa;
-            padding: 10px;
-            margin-bottom: 10px;
-            border-radius: 5px;
-        }
-        .result-box {
-            background-color: #e7f3ff;
-            border-left: 4px solid #0d6efd;
-            padding: 20px;
-            margin-top: 20px;
-            border-radius: 5px;
-        }
-        .text-end { text-align: right !important; }
-    </style>
+    <link href="/static/styles.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container main-container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">🛠️ 投资工具</h2>
-            <div>
-                <a href="/" class="btn btn-outline-secondary me-2">📈 投资组合</a>
-                <a href="/monitor" class="btn btn-outline-secondary me-2">📊 加仓监控</a>
-                <a href="/industry-board" class="btn btn-outline-secondary me-2">🏭 行业板块</a>
-                <a href="/xueqiu" class="btn btn-outline-secondary me-2">🏔️ 雪球监控</a>
-                <a href="/admin" class="btn btn-outline-secondary">⚙️ 数据管理</a>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title">
+                <h1>投资工具箱</h1>
+                <p>把高频计算与导出操作收进一个更轻量的操作台，减少切换和信息噪音。</p>
             </div>
+            <div class="hero-actions"></div>
         </div>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">组合</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip is-active" href="/tools">工具</a>
+            <a class="nav-chip" href="/industry-board">行业板块</a>
+            <a class="nav-chip" href="/xueqiu">雪球组合</a>
+            <a class="nav-chip" href="/admin">数据管理</a>
+        </div>
+    </section>
 
-        <div class="tool-card">
-            <h4 class="mb-3">💰 成本计算器</h4>
-            <p class="text-muted">计算多次买入后的平均持仓成本和总持仓数</p>
-            
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label class="form-label">选择持仓股票（可选）</label>
-                    <select id="stock-select" class="form-select">
-                        <option value="">-- 自定义输入 --</option>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">股票名称（自定义）</label>
-                    <input type="text" id="custom-name" class="form-control" placeholder="留空则使用持仓股票名称">
-                </div>
-            </div>
-
-            <div id="positions-container">
-                <div class="position-row" data-index="0">
-                    <div class="row align-items-end">
-                        <div class="col-md-4">
-                            <label class="form-label">买入价格</label>
-                            <input type="number" class="form-control price-input" step="0.01" placeholder="例: 10.50">
+    <section class="surface section">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="panel-card h-100">
+                    <div class="panel-card-header"><div><h4>成本计算器</h4><p class="mb-0 text-muted small">计算多次买入后的平均成本与总投入。</p></div></div>
+                    <div class="panel-card-body">
+                        <div class="mb-3">
+                            <label class="form-label">选择持仓股票（可选）</label>
+                            <select id="stock-select" class="form-select"><option value="">-- 自定义输入 --</option></select>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">买入股数</label>
-                            <input type="number" class="form-control shares-input" step="1" placeholder="例: 1000">
+                        <div class="mb-3">
+                            <label class="form-label">股票名称</label>
+                            <input type="text" id="custom-name" class="form-control" placeholder="可自定义显示名称">
                         </div>
-                        <div class="col-md-4">
-                            <button class="btn btn-danger btn-sm remove-position" onclick="removePosition(0)">删除</button>
+                        <div id="positions-container"></div>
+                        <div class="d-flex gap-2 flex-wrap mt-3">
+                            <button class="btn btn-outline-secondary" onclick="addPosition()">添加记录</button>
+                            <button class="btn btn-primary" onclick="calculate()">开始计算</button>
+                        </div>
+                        <div id="result-container" class="mt-4" style="display:none;">
+                            <div class="table-wrap">
+                                <table class="table-modern">
+                                    <thead><tr><th>股票</th><th class="text-end">总持仓</th><th class="text-end">平均成本</th><th class="text-end">总投入</th></tr></thead>
+                                    <tbody><tr><td id="result-name">-</td><td class="text-end mono" id="result-shares">-</td><td class="text-end mono" id="result-cost">-</td><td class="text-end mono" id="result-total">-</td></tr></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div class="mt-3">
-                <button class="btn btn-secondary" onclick="addPosition()">➕ 添加买入记录</button>
-                <button class="btn btn-primary ms-2" onclick="calculate()">🧮 计算成本</button>
-            </div>
-
-            <div id="result-container" style="display: none;" class="mt-4">
-                <h5 class="mb-3">📊 计算结果</h5>
-                <div class="table-responsive">
-                    <table class="table table-bordered align-middle">
-                        <thead>
-                            <tr>
-                                <th>股票名称</th>
-                                <th class="text-end">总持仓数</th>
-                                <th class="text-end">平均成本</th>
-                                <th class="text-end">总投入金额</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong id="result-name">-</strong></td>
-                                <td class="text-end font-monospace" id="result-shares">-</td>
-                                <td class="text-end font-monospace text-success fw-bold" id="result-cost">-</td>
-                                <td class="text-end font-monospace text-primary fw-bold" id="result-total">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="col-lg-6">
+                <div class="panel-card h-100">
+                    <div class="panel-card-header"><div><h4>K 线导出</h4><p class="mb-0 text-muted small">导出监控股票的历史数据，支持 CSV 与 Excel。</p></div></div>
+                    <div class="panel-card-body">
+                        <div class="mb-3">
+                            <label class="form-label">选择股票</label>
+                            <select id="export-stock-select" class="form-select"><option value="">-- 请选择 --</option></select>
+                            <div class="form-text" id="stock-info"></div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6"><label class="form-label">导出格式</label><select id="export-format" class="form-select"><option value="csv">CSV</option><option value="excel">Excel</option></select></div>
+                            <div class="col-md-6"><label class="form-label">开始日期</label><input type="date" id="export-start-date" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">结束日期</label><input type="date" id="export-end-date" class="form-control"></div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap mt-4">
+                            <button class="btn btn-success" onclick="exportKline()" id="export-btn">导出数据</button>
+                            <button class="btn btn-outline-secondary" onclick="resetExport()">重置</button>
+                        </div>
+                        <div id="export-result" class="mt-3" style="display:none;"></div>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div class="tool-card">
-            <h4 class="mb-3">📤 K线数据导出</h4>
-            <p class="text-muted">导出股票的日K线数据，支持CSV和Excel格式</p>
-            
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label class="form-label">选择股票 <span class="text-danger">*</span></label>
-                    <select id="export-stock-select" class="form-select">
-                        <option value="">-- 请选择 --</option>
-                    </select>
-                    <div class="form-text" id="stock-info"></div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">导出格式</label>
-                    <select id="export-format" class="form-select">
-                        <option value="csv">CSV</option>
-                        <option value="excel">Excel</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label class="form-label">开始日期（可选）</label>
-                    <input type="date" id="export-start-date" class="form-control">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label">结束日期（可选）</label>
-                    <input type="date" id="export-end-date" class="form-control">
-                </div>
-            </div>
-
-            <div class="mt-3">
-                <button class="btn btn-success" onclick="exportKline()" id="export-btn">
-                    📥 导出数据
-                </button>
-                <button class="btn btn-outline-secondary ms-2" onclick="resetExport()">
-                    🔄 重置
-                </button>
-            </div>
-
-            <div id="export-result" class="mt-3" style="display: none;"></div>
-        </div>
-    </div>
-
-    <script>
-        let positionIndex = 1;
-        let portfolioStocks = [];
-
-        async function loadPortfolioStocks() {
-            try {
-                const response = await fetch('/api/portfolio');
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    portfolioStocks = data.rows;
-                    const select = document.getElementById('stock-select');
-                    
-                    data.rows.forEach(stock => {
-                        const option = document.createElement('option');
-                        option.value = stock.code;
-                        option.textContent = `${stock.name} (${stock.code}) - 持仓: ${stock.shares}股 @ ¥${stock.cost_price.toFixed(2)}`;
-                        option.dataset.shares = stock.shares;
-                        option.dataset.price = stock.cost_price;
-                        option.dataset.name = stock.name;
-                        select.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('加载持仓数据失败:', error);
-            }
-        }
-
-        document.getElementById('stock-select').addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            if (this.value) {
-                const shares = selectedOption.dataset.shares;
-                const price = selectedOption.dataset.price;
-                const name = selectedOption.dataset.name;
-                
-                document.getElementById('custom-name').value = name;
-                
-                const container = document.getElementById('positions-container');
-                container.innerHTML = '';
-                positionIndex = 0;
-                
-                const firstPosition = document.createElement('div');
-                firstPosition.className = 'position-row';
-                firstPosition.dataset.index = positionIndex;
-                firstPosition.innerHTML = `
-                    <div class="row align-items-end">
-                        <div class="col-md-4">
-                            <label class="form-label">买入价格</label>
-                            <input type="number" class="form-control price-input" step="0.01" placeholder="例: 10.50" value="${price}">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">买入股数</label>
-                            <input type="number" class="form-control shares-input" step="1" placeholder="例: 1000" value="${shares}">
-                        </div>
-                        <div class="col-md-4">
-                            <button class="btn btn-danger btn-sm remove-position" onclick="removePosition(${positionIndex})">删除</button>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(firstPosition);
-                positionIndex++;
-            } else {
-                document.getElementById('custom-name').value = '';
-                const container = document.getElementById('positions-container');
-                container.innerHTML = '';
-                positionIndex = 0;
-                
-                const firstPosition = document.createElement('div');
-                firstPosition.className = 'position-row';
-                firstPosition.dataset.index = positionIndex;
-                firstPosition.innerHTML = `
-                    <div class="row align-items-end">
-                        <div class="col-md-4">
-                            <label class="form-label">买入价格</label>
-                            <input type="number" class="form-control price-input" step="0.01" placeholder="例: 10.50">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">买入股数</label>
-                            <input type="number" class="form-control shares-input" step="1" placeholder="例: 1000">
-                        </div>
-                        <div class="col-md-4">
-                            <button class="btn btn-danger btn-sm remove-position" onclick="removePosition(${positionIndex})">删除</button>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(firstPosition);
-                positionIndex++;
-            }
-        });
-
-        function addPosition() {
-            const container = document.getElementById('positions-container');
-            const newPosition = document.createElement('div');
-            newPosition.className = 'position-row';
-            newPosition.dataset.index = positionIndex;
-            newPosition.innerHTML = `
-                <div class="row align-items-end">
-                    <div class="col-md-4">
-                        <label class="form-label">买入价格</label>
-                        <input type="number" class="form-control price-input" step="0.01" placeholder="例: 10.50">
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">买入股数</label>
-                        <input type="number" class="form-control shares-input" step="1" placeholder="例: 1000">
-                    </div>
-                    <div class="col-md-4">
-                        <button class="btn btn-danger btn-sm remove-position" onclick="removePosition(${positionIndex})">删除</button>
-                    </div>
-                </div>
-            `;
-            container.appendChild(newPosition);
-            positionIndex++;
-        }
-
-        function removePosition(index) {
-            const positions = document.querySelectorAll('.position-row');
-            if (positions.length > 1) {
-                const position = document.querySelector(`.position-row[data-index="${index}"]`);
-                position.remove();
-            } else {
-                alert('至少保留一条买入记录');
-            }
-        }
-
-        function calculate() {
-            const positions = document.querySelectorAll('.position-row');
-            let totalShares = 0;
-            let totalCost = 0;
-            let valid = true;
-
-            positions.forEach(position => {
-                const price = parseFloat(position.querySelector('.price-input').value);
-                const shares = parseInt(position.querySelector('.shares-input').value);
-                
-                if (!price || !shares || price <= 0 || shares <= 0) {
-                    valid = false;
-                    return;
-                }
-                
-                totalShares += shares;
-                totalCost += price * shares;
-            });
-
-            if (!valid) {
-                alert('请填写所有买入记录的价格和股数，且必须大于0');
-                return;
-            }
-
-            if (totalShares === 0) {
-                alert('总持仓数不能为0');
-                return;
-            }
-
-            const avgCost = totalCost / totalShares;
-            
-            let stockName = document.getElementById('custom-name').value.trim();
-            if (!stockName) {
-                const select = document.getElementById('stock-select');
-                if (select.value) {
-                    stockName = select.options[select.selectedIndex].dataset.name;
-                } else {
-                    stockName = '未命名股票';
-                }
-            }
-
-            document.getElementById('result-name').textContent = stockName;
-            document.getElementById('result-shares').textContent = totalShares.toLocaleString() + ' 股';
-            document.getElementById('result-cost').textContent = avgCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            document.getElementById('result-total').textContent = totalCost.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            
-            document.getElementById('result-container').style.display = 'block';
-        }
-
-        document.addEventListener('DOMContentLoaded', loadPortfolioStocks);
-
-        // K线导出相关功能
-        let exportStocks = [];
-
-        async function loadExportStocks() {
-            try {
-                const response = await fetch('/api/tools/export-kline/stocks');
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    exportStocks = data.data;
-                    const select = document.getElementById('export-stock-select');
-                    
-                    data.data.forEach(stock => {
-                        const option = document.createElement('option');
-                        option.value = stock.code;
-                        option.textContent = `${stock.name} (${stock.code})`;
-                        option.dataset.latestDate = stock.latest_date || '无数据';
-                        select.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('加载股票列表失败:', error);
-            }
-        }
-
-        document.getElementById('export-stock-select').addEventListener('change', function() {
-            const selectedOption = this.options[this.selectedIndex];
-            const infoDiv = document.getElementById('stock-info');
-            
-            if (this.value) {
-                const latestDate = selectedOption.dataset.latestDate;
-                infoDiv.textContent = `最新数据日期: ${latestDate}`;
-                infoDiv.className = 'form-text text-info';
-            } else {
-                infoDiv.textContent = '';
-            }
-        });
-
-        async function exportKline() {
-            const code = document.getElementById('export-stock-select').value;
-            const format = document.getElementById('export-format').value;
-            const startDate = document.getElementById('export-start-date').value;
-            const endDate = document.getElementById('export-end-date').value;
-            const btn = document.getElementById('export-btn');
-            const resultDiv = document.getElementById('export-result');
-
-            if (!code) {
-                alert('请选择要导出的股票');
-                return;
-            }
-
-            // 验证日期范围
-            if (startDate && endDate && startDate > endDate) {
-                alert('开始日期不能晚于结束日期');
-                return;
-            }
-
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 导出中...';
-            resultDiv.style.display = 'none';
-
-            try {
-                const response = await fetch('/api/tools/export-kline', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        code: code,
-                        format: format,
-                        start_date: startDate || null,
-                        end_date: endDate || null
-                    })
-                });
-
-                if (response.ok) {
-                    // 下载文件
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || `kline_data.${format === 'csv' ? 'csv' : 'xlsx'}`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-
-                    resultDiv.innerHTML = '<div class="alert alert-success">✅ 导出成功！</div>';
-                    resultDiv.style.display = 'block';
-                } else {
-                    const error = await response.json();
-                    resultDiv.innerHTML = `<div class="alert alert-danger">❌ 导出失败: ${error.message || '未知错误'}</div>`;
-                    resultDiv.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('导出失败:', error);
-                resultDiv.innerHTML = '<div class="alert alert-danger">❌ 导出失败: 网络错误</div>';
-                resultDiv.style.display = 'block';
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '📥 导出数据';
-            }
-        }
-
-        function resetExport() {
-            document.getElementById('export-stock-select').value = '';
-            document.getElementById('export-format').value = 'csv';
-            document.getElementById('export-start-date').value = '';
-            document.getElementById('export-end-date').value = '';
-            document.getElementById('stock-info').textContent = '';
-            document.getElementById('export-result').style.display = 'none';
-        }
-
-        // 加载导出股票列表
-        loadExportStocks();
-    </script>
+    </section>
+</div>
+<script>
+let positionIndex = 0;
+let portfolioStocks = [];
+function createPositionRow(index, price = '', shares = '') {
+    const node = document.createElement('div');
+    node.className = 'form-panel mb-3 position-row';
+    node.dataset.index = index;
+    node.innerHTML = `<div class="row g-3 align-items-end"><div class="col-md-5"><label class="form-label">买入价格</label><input type="number" class="form-control price-input" step="0.01" value="${price}" placeholder="例如 10.50"></div><div class="col-md-5"><label class="form-label">买入股数</label><input type="number" class="form-control shares-input" step="1" value="${shares}" placeholder="例如 1000"></div><div class="col-md-2"><button class="btn btn-outline-danger w-100" onclick="removePosition(${index})">删除</button></div></div>`;
+    return node;
+}
+function addPosition(price = '', shares = '') { document.getElementById('positions-container').appendChild(createPositionRow(positionIndex++, price, shares)); }
+function removePosition(index) { const rows = document.querySelectorAll('.position-row'); if (rows.length === 1) return alert('至少保留一条买入记录'); document.querySelector(`.position-row[data-index="${index}"]`)?.remove(); }
+async function loadPortfolioStocks() { try { const response = await fetch('/api/portfolio'); const data = await response.json(); if (data.status === 'success') { portfolioStocks = data.rows; const select = document.getElementById('stock-select'); data.rows.forEach(stock => { const option = document.createElement('option'); option.value = stock.code; option.textContent = `${stock.name} (${stock.code})`; option.dataset.shares = stock.shares; option.dataset.price = stock.cost_price; option.dataset.name = stock.name; select.appendChild(option); }); } } catch (error) { console.error(error); } }
+document.getElementById('stock-select').addEventListener('change', function(){ const container = document.getElementById('positions-container'); container.innerHTML = ''; positionIndex = 0; if (this.value) { const option = this.options[this.selectedIndex]; document.getElementById('custom-name').value = option.dataset.name; addPosition(option.dataset.price, option.dataset.shares); } else { document.getElementById('custom-name').value = ''; addPosition(); } });
+function calculate() { const rows = document.querySelectorAll('.position-row'); let totalShares = 0, totalCost = 0, valid = true; rows.forEach(row => { const price = parseFloat(row.querySelector('.price-input').value); const shares = parseInt(row.querySelector('.shares-input').value); if (!price || !shares || price <= 0 || shares <= 0) valid = false; else { totalShares += shares; totalCost += price * shares; } }); if (!valid) return alert('请填写有效的价格和股数'); const avgCost = totalCost / totalShares; const stockName = document.getElementById('custom-name').value.trim() || '未命名股票'; document.getElementById('result-name').textContent = stockName; document.getElementById('result-shares').textContent = `${totalShares.toLocaleString()} 股`; document.getElementById('result-cost').textContent = avgCost.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); document.getElementById('result-total').textContent = totalCost.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2}); document.getElementById('result-container').style.display = 'block'; }
+async function loadExportStocks() { try { const response = await fetch('/api/tools/export-kline/stocks'); const data = await response.json(); if (data.status === 'success') { const select = document.getElementById('export-stock-select'); data.data.forEach(stock => { const option = document.createElement('option'); option.value = stock.code; option.textContent = `${stock.name} (${stock.code})`; option.dataset.latestDate = stock.latest_date || '暂无'; select.appendChild(option); }); } } catch (error) { console.error(error); } }
+document.getElementById('export-stock-select').addEventListener('change', function(){ const option = this.options[this.selectedIndex]; document.getElementById('stock-info').textContent = this.value ? `最新数据日期：${option.dataset.latestDate}` : ''; });
+async function exportKline() { const code = document.getElementById('export-stock-select').value; const format = document.getElementById('export-format').value; const startDate = document.getElementById('export-start-date').value; const endDate = document.getElementById('export-end-date').value; const btn = document.getElementById('export-btn'); const resultDiv = document.getElementById('export-result'); if (!code) return alert('请选择要导出的股票'); btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 导出中'; try { const response = await fetch('/api/tools/export-kline', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ code, format, start_date: startDate || null, end_date: endDate || null }) }); if (response.ok) { const blob = await response.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || `kline.${format==='csv'?'csv':'xlsx'}`; document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url); a.remove(); resultDiv.innerHTML = '<div class="alert alert-success">导出成功</div>'; } else { const error = await response.json(); resultDiv.innerHTML = `<div class="alert alert-danger">导出失败：${error.detail || error.message || '未知错误'}</div>`; } resultDiv.style.display = 'block'; } catch (error) { resultDiv.innerHTML = '<div class="alert alert-danger">导出失败：网络错误</div>'; resultDiv.style.display = 'block'; } finally { btn.disabled = false; btn.innerHTML = '导出数据'; } }
+function resetExport() { document.getElementById('export-stock-select').value = ''; document.getElementById('export-format').value = 'csv'; document.getElementById('export-start-date').value = ''; document.getElementById('export-end-date').value = ''; document.getElementById('stock-info').textContent = ''; document.getElementById('export-result').style.display = 'none'; }
+document.addEventListener('DOMContentLoaded', () => { addPosition(); loadPortfolioStocks(); loadExportStocks(); });
+</script>
 </body>
 </html>

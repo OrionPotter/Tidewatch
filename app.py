@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from api.router_registry import register_api_routers
 from utils.db import close_db_pool, init_db_pool
@@ -75,6 +76,7 @@ def register_page_routes(app: FastAPI) -> None:
 
 def create_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)
+    app.mount('/static', StaticFiles(directory='static'), name='static')
     app.add_middleware(
         CORSMiddleware,
         allow_origins=['*'],
