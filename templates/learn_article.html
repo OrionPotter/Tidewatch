@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章学习 · Tidewatch</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title">
+                <h1 id="article-title">加载中...</h1>
+                <p><a class="learn-back-link" href="/learn">返回文章列表</a></p>
+            </div>
+        </div>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">首页</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip" href="/tools">工具</a>
+            <a class="nav-chip" href="/xueqiu">参考组合</a>
+            <a class="nav-chip is-active" href="/learn">学习</a>
+            <a class="nav-chip" href="/admin">管理</a>
+        </div>
+    </section>
+
+    <section class="surface section">
+        <div class="learn-article-meta" id="article-meta">正在加载文章...</div>
+        <article id="article-content" class="markdown-body">
+            <div class="empty-state">正在加载文章...</div>
+        </article>
+    </section>
+</div>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script>
+const slug = {{ slug | tojson }};
+
+async function loadArticle() {
+    const titleEl = document.getElementById('article-title');
+    const metaEl = document.getElementById('article-meta');
+    const contentEl = document.getElementById('article-content');
+
+    try {
+        const response = await fetch(`/api/learn/${slug}`);
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error('加载失败');
+        }
+
+        const article = result.data.article;
+        const content = result.data.content || '';
+
+        document.title = `${article.title} · Tidewatch`;
+        titleEl.textContent = article.title;
+        metaEl.innerHTML = `
+            <span class="badge-soft badge-primary-soft">第 ${article.order} 篇</span>
+            <span class="learn-source">${article.source_name}</span>
+            <a class="learn-source-link" href="${article.source_url}" target="_blank" rel="noreferrer">原文来源</a>
+        `;
+        contentEl.innerHTML = marked.parse(content);
+    } catch (error) {
+        console.error(error);
+        titleEl.textContent = '文章加载失败';
+        metaEl.textContent = '';
+        contentEl.innerHTML = '<div class="empty-state text-danger">文章内容加载失败</div>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadArticle);
+</script>
+</body>
+</html>

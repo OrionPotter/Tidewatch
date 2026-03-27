@@ -484,6 +484,114 @@ body {
   background: #ecfeff;
   color: #155e75;
 }
+.learn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.learn-card {
+  display: block;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.98));
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: 0 8px 22px rgba(15,23,42,.06);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.learn-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(15,23,42,.10);
+  border-color: rgba(79,70,229,.22);
+}
+.learn-card-order {
+  font-size: 12px;
+  color: var(--primary);
+  margin-bottom: 10px;
+  font-weight: 700;
+}
+.learn-card h4 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+.learn-card-meta {
+  color: var(--muted);
+  font-size: 12px;
+  word-break: break-word;
+}
+.learn-article-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.learn-back-link,
+.learn-source-link {
+  color: rgba(255,255,255,.92);
+}
+.learn-source {
+  color: var(--muted);
+  font-size: 13px;
+}
+.markdown-body {
+  max-width: 900px;
+  line-height: 1.75;
+  color: #1f2937;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin-top: 1.6em;
+  margin-bottom: .7em;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.markdown-body h1:first-child {
+  margin-top: 0;
+}
+.markdown-body p,
+.markdown-body li,
+.markdown-body blockquote {
+  font-size: 15px;
+}
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 1.4rem;
+}
+.markdown-body code {
+  padding: .14rem .35rem;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #3730a3;
+}
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+}
+.markdown-body blockquote {
+  margin: 1rem 0;
+  padding: .9rem 1rem;
+  border-left: 4px solid #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
 
 @media (max-width: 768px) {
   .app-shell { width: min(100% - 20px, 100%); }
@@ -499,6 +607,9 @@ body {
     grid-template-columns: 1fr;
   }
   .section-single .focus-list {
+    grid-template-columns: 1fr;
+  }
+  .learn-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -63,6 +63,7 @@ async def lifespan(app: FastAPI):
 PAGE_TEMPLATES = {
     '/': 'index.html',
     '/admin': 'admin.html',
+    '/learn': 'learn.html',
     '/monitor': 'monitor.html',
     '/tools': 'tools.html',
     '/xueqiu': 'xueqiu.html',
@@ -113,6 +114,10 @@ def create_app() -> FastAPI:
             status_code=503,
             content={'detail': str(exc)},
         )
+
+    @app.get('/learn/{slug}', response_class=HTMLResponse)
+    async def learn_article_page(request: Request, slug: str):
+        return render_page('learn_article.html', request, slug=slug)
 
     register_api_routers(app)
     register_page_routes(app)

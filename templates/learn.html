@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学习 · Tidewatch</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title">
+                <h1>Price Action 学习</h1>
+                <p>按文章卡片浏览教程章节，点击进入详情页学习。</p>
+            </div>
+        </div>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">首页</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip" href="/tools">工具</a>
+            <a class="nav-chip" href="/xueqiu">参考组合</a>
+            <a class="nav-chip is-active" href="/learn">学习</a>
+            <a class="nav-chip" href="/admin">管理</a>
+        </div>
+    </section>
+
+    <section class="surface section">
+        <div class="section-title">
+            <div>
+                <h3>全部文章</h3>
+            </div>
+            <div class="toolbar-summary" id="learn-count">加载中...</div>
+        </div>
+        <div id="learn-grid" class="learn-grid">
+            <div class="empty-state">正在加载文章...</div>
+        </div>
+    </section>
+</div>
+
+<script>
+async function loadLearnIndex() {
+    const grid = document.getElementById('learn-grid');
+    try {
+        const response = await fetch('/api/learn');
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error('加载失败');
+        }
+
+        const articles = (result.data && result.data.articles) || [];
+        document.getElementById('learn-count').textContent = `${articles.length} 篇文章`;
+
+        if (!articles.length) {
+            grid.innerHTML = '<div class="empty-state">暂无学习文章</div>';
+            return;
+        }
+
+        grid.innerHTML = articles.map(article => `
+            <a class="learn-card" href="/learn/${article.slug}">
+                <div class="learn-card-order mono">${article.order}</div>
+                <h4>${article.title}</h4>
+                <div class="learn-card-meta">${article.source_name}</div>
+            </a>
+        `).join('');
+    } catch (error) {
+        console.error(error);
+        document.getElementById('learn-count').textContent = '加载失败';
+        grid.innerHTML = '<div class="empty-state text-danger">文章列表加载失败</div>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadLearnIndex);
+</script>
+</body>
+</html>
