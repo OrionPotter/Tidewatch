@@ -38,16 +38,25 @@
             </div>
         </div>
         <div class="table-wrap">
-            <table class="table-modern recap-table">
+            <table class="table-modern recap-table recap-list-table">
+                <colgroup>
+                    <col style="width: 14%;">
+                    <col style="width: 14%;">
+                    <col style="width: 14%;">
+                    <col style="width: 14%;">
+                    <col style="width: 14%;">
+                    <col style="width: 14%;">
+                    <col style="width: 16%;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>时间</th>
                         <th>股票</th>
                         <th>策略</th>
-                        <th class="text-end">盈亏金额</th>
-                        <th class="text-end">盈亏比</th>
-                        <th class="text-center">结果</th>
-                        <th class="text-end">操作</th>
+                        <th>盈亏金额</th>
+                        <th>盈亏比</th>
+                        <th>结果</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="recap-table-body">
@@ -80,6 +89,13 @@ function formatMoney(value) {
     return Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatDateOnly(value) {
+    if (!value) {
+        return '-';
+    }
+    return String(value).slice(0, 10);
+}
+
 async function loadRecaps() {
     const tbody = document.getElementById('recap-table-body');
     try {
@@ -96,7 +112,7 @@ async function loadRecaps() {
         }
         tbody.innerHTML = records.map(record => `
             <tr>
-                <td class="mono">${escapeHtml(record.review_date)}</td>
+                <td class="mono">${formatDateOnly(record.review_date)}</td>
                 <td>
                     <a class="recap-link" href="/recaps/${record.id}">
                         <strong>${escapeHtml(record.stock_name)}</strong>
@@ -104,14 +120,14 @@ async function loadRecaps() {
                     <div class="text-muted small mono">${escapeHtml(record.stock_code || '-')}</div>
                 </td>
                 <td>${escapeHtml(record.strategy_tag || '未分类')}</td>
-                <td class="text-end mono ${Number(record.profit_amount) > 0 ? 'status-positive' : Number(record.profit_amount) < 0 ? 'status-negative' : ''}">${formatMoney(record.profit_amount)}</td>
-                <td class="text-end mono">${record.risk_reward_ratio ?? '-'}</td>
-                <td class="text-center">
+                <td class="mono ${Number(record.profit_amount) > 0 ? 'status-positive' : Number(record.profit_amount) < 0 ? 'status-negative' : ''}">${formatMoney(record.profit_amount)}</td>
+                <td class="mono">${record.risk_reward_ratio ?? '-'}</td>
+                <td>
                     <span class="badge-soft ${record.is_success ? 'badge-success-soft' : 'badge-danger-soft'}">${formatBool(record.is_success)}</span>
                 </td>
-                <td class="text-end">
+                <td>
                     <div class="recap-row-actions">
-                        <a class="recap-detail-btn" href="/recaps/${record.id}">查看详情 <span>→</span></a>
+                        <a class="recap-detail-btn recap-detail-btn-compact" href="/recaps/${record.id}">查看详情 <span>→</span></a>
                     </div>
                 </td>
             </tr>

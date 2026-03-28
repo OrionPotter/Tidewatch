@@ -121,6 +121,14 @@ def create_app() -> FastAPI:
     async def learn_article_page(request: Request, slug: str):
         return render_page('learn_article.html', request, slug=slug)
 
+    @app.get('/analysis/new', response_class=HTMLResponse)
+    async def analysis_create_page(request: Request):
+        return render_page('analysis_form.html', request)
+
+    @app.get('/analysis/{report_id}', response_class=HTMLResponse)
+    async def analysis_detail_page(request: Request, report_id: int):
+        return render_page('analysis_detail.html', request, report_id=report_id)
+
     @app.get('/recaps/new', response_class=HTMLResponse)
     async def recap_create_page(request: Request):
         return render_page('recap_form.html', request)

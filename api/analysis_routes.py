@@ -40,3 +40,15 @@ async def create_analysis_report(payload: AnalysisRequest):
     except Exception as exc:
         logger.error(f'POST /api/analysis failed: {exc}')
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@analysis_router.delete('/{report_id}')
+async def delete_analysis_report(report_id: int):
+    logger.info(f'DELETE /api/analysis/{report_id}')
+    report = await PriceActionService.get_report(report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail='分析记录不存在')
+    deleted = await PriceActionService.delete_report(report_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail='分析记录不存在')
+    return success_response(timestamp=current_timestamp(), message='分析记录已删除')

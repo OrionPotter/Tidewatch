@@ -134,3 +134,10 @@ class AnalysisRepository:
                 report_id,
             )
             return dict(row) if row else None
+
+    @staticmethod
+    async def delete_report(report_id: int) -> bool:
+        await AnalysisRepository.ensure_table()
+        async with get_db_conn() as conn:
+            result = await conn.execute('DELETE FROM analysis_reports WHERE id = $1', report_id)
+            return result.endswith('1')

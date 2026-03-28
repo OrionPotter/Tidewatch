@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创建分析 - Tidewatch</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title"><h1>创建分析</h1></div>
+        </div>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">首页</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip" href="/tools">工具</a>
+            <a class="nav-chip" href="/xueqiu">组合</a>
+            <a class="nav-chip is-active" href="/analysis">分析</a>
+            <a class="nav-chip" href="/recaps">复盘</a>
+            <a class="nav-chip" href="/learn">学习</a>
+            <a class="nav-chip" href="/admin">管理</a>
+        </div>
+    </section>
+    <section class="surface section section-feature">
+        <div class="section-title">
+            <div><h3>发起分析</h3></div>
+            <div class="recap-list-toolbar">
+                <a class="btn btn-outline-secondary" href="/analysis">返回列表</a>
+            </div>
+        </div>
+        <form id="analysis-form" class="form-panel">
+            <div class="mb-3">
+                <label class="form-label" for="analysis-code">股票代码</label>
+                <input class="form-control" id="analysis-code" value="600000" placeholder="如 600000 或 sh600000" required>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="analysis-period">周期</label>
+                    <select class="form-select" id="analysis-period">
+                        <option value="daily">日线</option>
+                        <option value="weekly">周线</option>
+                        <option value="monthly">月线</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="analysis-count">K线数量</label>
+                    <input class="form-control" id="analysis-count" type="number" min="20" max="250" value="60">
+                </div>
+            </div>
+            <div class="recap-form-actions">
+                <button class="btn btn-primary" type="submit" id="analysis-submit">开始分析</button>
+                <a class="btn btn-outline-secondary" href="/analysis">取消</a>
+            </div>
+        </form>
+    </section>
+</div>
+<script src="/static/ui.js"></script>
+<script>
+document.getElementById('analysis-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('analysis-submit');
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 分析中';
+    try {
+        const payload = {
+            code: document.getElementById('analysis-code').value.trim(),
+            period: document.getElementById('analysis-period').value,
+            count: Number(document.getElementById('analysis-count').value),
+        };
+        const response = await fetch('/api/analysis', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error(result.detail || '分析失败');
+        }
+        window.location.href = `/analysis/${result.data.id}`;
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || '分析失败', 'error');
+        button.disabled = false;
+        button.textContent = '开始分析';
+    }
+});
+</script>
+</body>
+</html>

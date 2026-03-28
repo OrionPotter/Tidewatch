@@ -10,8 +10,9 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from repositories.kline_repository import KlineRepository
 from repositories.analysis_repository import AnalysisRepository
+from repositories.kline_repository import KlineRepository
+from repositories.stock_list_repository import StockListRepository
 from utils.logger import get_logger
 
 logger = get_logger('price_action_service')
@@ -548,8 +549,30 @@ class PriceActionService:
 
     @staticmethod
     async def list_reports(limit: int = 50) -> list[dict]:
-        return await AnalysisRepository.list_reports(limit=limit)
+        reports = await AnalysisRepository.list_reports(limit=limit)
+        return [await PriceActionService._hydrate_stock_name(report) for report in reports]
 
     @staticmethod
     async def get_report(report_id: int) -> dict | None:
-        return await AnalysisRepository.get_report(report_id)
+        report = await AnalysisRepository.get_report(report_id)
+        if report is None:
+            return None
+        return await PriceActionService._hydrate_stock_name(report)
+
+    @staticmethod
+    async def delete_report(report_id: int) -> bool:
+        return await AnalysisRepository.delete_report(report_id)
+
+    @staticmethod
+    async def _hydrate_stock_name(report: dict) -> dict:
+        stock_name = (report.get('stock_name') or '').strip()
+        code = (report.get('code') or '').strip()
+        if stock_name and stock_name != code:
+            return report
+
+        stock = await StockListRepository.get_by_code(code)
+        if stock and getattr(stock, 'name', None):
+            hydrated = dict(report)
+            hydrated['stock_name'] = stock.name
+            return hydrated
+        return report

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分析详情 - Tidewatch</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title"><h1 id="analysis-title">分析详情</h1></div>
+        </div>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">首页</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip" href="/tools">工具</a>
+            <a class="nav-chip" href="/xueqiu">组合</a>
+            <a class="nav-chip is-active" href="/analysis">分析</a>
+            <a class="nav-chip" href="/recaps">复盘</a>
+            <a class="nav-chip" href="/learn">学习</a>
+            <a class="nav-chip" href="/admin">管理</a>
+        </div>
+    </section>
+    <section class="surface section section-feature">
+        <div class="section-title">
+            <div><h3 id="analysis-meta">加载中...</h3></div>
+            <div class="recap-list-toolbar">
+                <a class="btn btn-outline-secondary" href="/analysis">返回列表</a>
+                <button class="btn btn-outline-danger" type="button" id="delete-analysis-btn">删除</button>
+            </div>
+        </div>
+        <article id="analysis-content" class="markdown-body">
+            <div class="empty-state">正在加载分析详情...</div>
+        </article>
+    </section>
+</div>
+<script src="https://cdn.bootcdn.net/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="/static/ui.js"></script>
+<script>
+const reportId = window.location.pathname.split('/').filter(Boolean)[1];
+
+function formatDateCompact(value) {
+    if (!value) {
+        return '-';
+    }
+    return String(value).slice(0, 10).replaceAll('-', '');
+}
+
+function periodLabel(value) {
+    if (value === 'daily') return '日线';
+    if (value === 'weekly') return '周线';
+    if (value === 'monthly') return '月线';
+    return value || '-';
+}
+
+async function loadReport() {
+    const content = document.getElementById('analysis-content');
+    const meta = document.getElementById('analysis-meta');
+    try {
+        const response = await fetch(`/api/analysis/${reportId}`);
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error('加载失败');
+        }
+        const report = result.data.report;
+        document.getElementById('analysis-title').textContent = `${report.stock_name || report.code} 分析`;
+        meta.textContent = `${formatDateCompact(report.created_at)} / ${periodLabel(report.period)} / ${report.kline_count} 根 / ${report.model_name}`;
+        content.innerHTML = marked.parse(report.analysis_markdown || '');
+    } catch (error) {
+        console.error(error);
+        meta.textContent = '加载失败';
+        content.innerHTML = '<div class="empty-state text-danger">分析详情加载失败</div>';
+    }
+}
+
+async function deleteReport() {
+    if (!window.confirm('确认删除这条分析记录吗？')) {
+        return;
+    }
+    try {
+        const response = await fetch(`/api/analysis/${reportId}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error(result.detail || result.message || '删除失败');
+        }
+        window.location.href = '/analysis';
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || '删除失败', 'error');
+    }
+}
+
+document.getElementById('delete-analysis-btn').addEventListener('click', deleteReport);
+document.addEventListener('DOMContentLoaded', loadReport);
+</script>
+</body>
+</html>

@@ -727,6 +727,50 @@ body {
 .recap-table td {
   vertical-align: middle;
 }
+.analysis-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.recap-list-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.analysis-table th,
+.analysis-table td {
+  text-align: center !important;
+}
+.recap-list-table th,
+.recap-list-table td {
+  text-align: center !important;
+}
+.analysis-table th:nth-child(4),
+.analysis-table td:nth-child(4),
+.analysis-table th:nth-child(6),
+.analysis-table td:nth-child(6) {
+  text-align: center !important;
+}
+.analysis-table th:not(:last-child),
+.analysis-table td:not(:last-child) {
+  border-right: 1px solid rgba(226,232,240,.75);
+}
+.recap-list-table th:not(:last-child),
+.recap-list-table td:not(:last-child) {
+  border-right: 1px solid rgba(226,232,240,.75);
+}
+.recap-table th,
+.recap-table td {
+  white-space: nowrap;
+}
+.recap-table td:nth-child(2),
+.recap-table th:nth-child(2),
+.recap-table td:nth-child(5),
+.recap-table th:nth-child(5) {
+  white-space: normal;
+}
+.recap-list-table td:nth-child(2),
+.recap-list-table th:nth-child(2) {
+  white-space: normal;
+}
 .recap-link {
   color: #0f172a;
   text-decoration: none;
@@ -738,7 +782,7 @@ body {
 .recap-row-actions {
   display: inline-flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: center;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -767,6 +811,12 @@ body {
   box-shadow: 0 10px 24px rgba(15,118,110,.12);
   color: #115e59;
   text-decoration: none;
+}
+.recap-detail-btn-compact {
+  width: 100%;
+  justify-content: center;
+  min-width: 0;
+  padding: 8px 10px;
 }
 .recap-failure-cell {
   max-width: 240px;
