@@ -425,3 +425,28 @@ CREATE TABLE IF NOT EXISTS prompt_assets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_prompt_assets_category ON prompt_assets(category);
+
+CREATE TABLE IF NOT EXISTS custom_portfolios (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    notes TEXT DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS custom_portfolio_holdings (
+    id SERIAL PRIMARY KEY,
+    portfolio_id INTEGER NOT NULL REFERENCES custom_portfolios(id) ON DELETE CASCADE,
+    code VARCHAR(20) NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    cost_price NUMERIC(12, 3) NOT NULL CHECK (cost_price >= 0),
+    shares INTEGER NOT NULL CHECK (shares > 0),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_portfolio_holdings_portfolio_id
+    ON custom_portfolio_holdings(portfolio_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_portfolio_holdings_unique
+    ON custom_portfolio_holdings(portfolio_id, code);

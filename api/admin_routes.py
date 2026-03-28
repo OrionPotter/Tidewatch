@@ -9,8 +9,6 @@ from schemas.admin import (
     AdminStockCreate,
     AdminStockUpdate,
     ToggleEnabled,
-    XueqiuCubeCreate,
-    XueqiuCubeUpdate,
 )
 from utils.logger import get_logger
 
@@ -84,44 +82,4 @@ async def delete_monitor_stock(code: str):
 @admin_router.post('/monitor-stocks/{code}/toggle')
 async def toggle_monitor_stock(code: str, data: ToggleEnabled):
     success = await MonitorStockRepository.toggle_enabled(code, data.enabled)
-    return bool_status_response(success, '操作成功', '操作失败')
-
-
-@admin_router.get('/xueqiu-cubes')
-async def list_xueqiu_cubes():
-    from repositories.xueqiu_repository import XueqiuCubeRepository
-
-    cubes = await XueqiuCubeRepository.get_all()
-    return list_response(cubes)
-
-
-@admin_router.post('/xueqiu-cubes')
-async def create_xueqiu_cube(data: XueqiuCubeCreate):
-    from repositories.xueqiu_repository import XueqiuCubeRepository
-
-    success, msg = await XueqiuCubeRepository.add(data.cube_symbol, data.cube_name, data.enabled)
-    return bool_status_response(success, msg, msg)
-
-
-@admin_router.put('/xueqiu-cubes/{cube_symbol}')
-async def update_xueqiu_cube(cube_symbol: str, data: XueqiuCubeUpdate):
-    from repositories.xueqiu_repository import XueqiuCubeRepository
-
-    success = await XueqiuCubeRepository.update(cube_symbol, data.cube_name, data.enabled)
-    return bool_status_response(success, '更新成功', '更新失败')
-
-
-@admin_router.delete('/xueqiu-cubes/{cube_symbol}')
-async def delete_xueqiu_cube(cube_symbol: str):
-    from repositories.xueqiu_repository import XueqiuCubeRepository
-
-    success = await XueqiuCubeRepository.delete(cube_symbol)
-    return bool_status_response(success, '删除成功', '删除失败')
-
-
-@admin_router.post('/xueqiu-cubes/{cube_symbol}/toggle')
-async def toggle_xueqiu_cube(cube_symbol: str, data: ToggleEnabled):
-    from repositories.xueqiu_repository import XueqiuCubeRepository
-
-    success = await XueqiuCubeRepository.toggle_enabled(cube_symbol, data.enabled)
     return bool_status_response(success, '操作成功', '操作失败')

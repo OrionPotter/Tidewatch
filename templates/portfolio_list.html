@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的组合 · Tidewatch</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title">
+                <h1>我的组合</h1>
+                <p>列表页只展示组合级别信息，具体持仓请进入详情页查看。</p>
+            </div>
+        </div>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">首页</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip" href="/tools">工具</a>
+            <a class="nav-chip is-active" href="/portfolios">组合</a>
+            <a class="nav-chip" href="/analysis">分析</a>
+            <a class="nav-chip" href="/recaps">复盘</a>
+            <a class="nav-chip" href="/learn">学习</a>
+            <a class="nav-chip" href="/admin">管理</a>
+        </div>
+    </section>
+
+    <section class="surface section section-table section-table-full">
+        <div class="section-title">
+            <div>
+                <h3>组合列表</h3>
+                <p id="portfolio-summary-text">正在加载组合数据...</p>
+            </div>
+            <div>
+                <button id="open-create-btn" class="btn btn-primary" type="button">创建组合</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="table-modern">
+                <thead>
+                    <tr>
+                        <th>组合名称</th>
+                        <th class="text-center">创建天数</th>
+                        <th class="text-end">组合成本</th>
+                        <th class="text-end">组合市值</th>
+                        <th class="text-end">组合盈亏</th>
+                        <th class="text-end">收益率</th>
+                        <th class="text-center">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="portfolio-list-body">
+                    <tr><td colspan="7" class="empty-state">正在加载组合数据...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div class="portfolio-modal" id="portfolio-modal" hidden>
+    <div class="portfolio-modal-backdrop" data-close-modal="true"></div>
+    <div class="portfolio-modal-body">
+        <div class="portfolio-modal-head">
+            <div>
+                <h3>创建组合</h3>
+                <p>录入组合名称、备注和初始持仓。</p>
+            </div>
+            <button class="portfolio-modal-close" type="button" data-close-modal="true">&times;</button>
+        </div>
+        <form id="portfolio-form" class="portfolio-form-stack">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="portfolio-name">组合名称</label>
+                    <input class="form-control" id="portfolio-name" maxlength="120" placeholder="例如：趋势仓 / 防守仓" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="portfolio-notes">组合备注</label>
+                    <input class="form-control" id="portfolio-notes" maxlength="1000" placeholder="一句话描述组合用途或策略">
+                </div>
+            </div>
+
+            <div class="portfolio-form-section">
+                <div class="portfolio-form-section-head">
+                    <h4>持仓条目</h4>
+                    <button class="btn btn-outline-primary" type="button" id="add-row-btn">添加一行</button>
+                </div>
+                <div id="holding-rows" class="holding-rows"></div>
+            </div>
+
+            <div class="portfolio-form-submit">
+                <button class="btn btn-outline-secondary" type="button" data-close-modal="true">取消</button>
+                <button class="btn btn-primary" type="submit" id="submit-btn">保存组合</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<template id="holding-row-template">
+    <div class="holding-row">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">股票代码</label>
+                <input class="form-control holding-code" placeholder="如 sh600519 / sz000001 / 600519" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">股票名称</label>
+                <input class="form-control holding-name" placeholder="可自定义显示名称" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">成本价</label>
+                <input class="form-control holding-cost" type="number" min="0" step="0.001" placeholder="0.00" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">股数</label>
+                <input class="form-control holding-shares" type="number" min="1" step="1" placeholder="100" required>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-danger holding-remove-btn w-100" type="button">删除</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script src="/static/ui.js"></script>
+<script>
+const tbody = document.getElementById('portfolio-list-body');
+const portfolioSummaryText = document.getElementById('portfolio-summary-text');
+const modal = document.getElementById('portfolio-modal');
+const form = document.getElementById('portfolio-form');
+const portfolioNameInput = document.getElementById('portfolio-name');
+const portfolioNotesInput = document.getElementById('portfolio-notes');
+const holdingRows = document.getElementById('holding-rows');
+const holdingRowTemplate = document.getElementById('holding-row-template');
+const submitBtn = document.getElementById('submit-btn');
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function normalizeCode(code) {
+    const raw = String(code || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw.startsWith('sh') || raw.startsWith('sz')) return raw;
+    return raw.startsWith('6') ? `sh${raw}` : `sz${raw}`;
+}
+
+function formatMoney(value) {
+    const number = Number(value);
+    if (Number.isNaN(number)) return '-';
+    return number.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatPercent(value) {
+    const number = Number(value);
+    if (Number.isNaN(number)) return '-';
+    return `${number >= 0 ? '+' : ''}${number.toFixed(2)}%`;
+}
+
+function toneClass(value) {
+    const number = Number(value);
+    if (number > 0) return 'status-positive';
+    if (number < 0) return 'status-negative';
+    return 'status-neutral';
+}
+
+function daysSince(value) {
+    if (!value) return '-';
+    const createdAt = new Date(String(value).replace(' ', 'T'));
+    const today = new Date();
+    return Math.max(0, Math.floor((today.getTime() - createdAt.getTime()) / 86400000));
+}
+
+function addHoldingRow(values = {}) {
+    const fragment = holdingRowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector('.holding-row');
+    row.querySelector('.holding-code').value = values.code || '';
+    row.querySelector('.holding-name').value = values.name || '';
+    row.querySelector('.holding-cost').value = values.cost_price ?? '';
+    row.querySelector('.holding-shares').value = values.shares ?? '';
+    row.querySelector('.holding-remove-btn').addEventListener('click', () => {
+        if (holdingRows.children.length === 1) {
+            row.querySelector('.holding-code').value = '';
+            row.querySelector('.holding-name').value = '';
+            row.querySelector('.holding-cost').value = '';
+            row.querySelector('.holding-shares').value = '';
+            return;
+        }
+        row.remove();
+    });
+    holdingRows.appendChild(row);
+}
+
+function collectHoldingRows() {
+    return Array.from(holdingRows.querySelectorAll('.holding-row'))
+        .map(row => ({
+            code: normalizeCode(row.querySelector('.holding-code').value),
+            name: row.querySelector('.holding-name').value.trim(),
+            cost_price: Number(row.querySelector('.holding-cost').value),
+            shares: Number(row.querySelector('.holding-shares').value),
+        }))
+        .filter(item => item.code || item.name || item.cost_price || item.shares);
+}
+
+function openModal() {
+    form.reset();
+    holdingRows.innerHTML = '';
+    addHoldingRow();
+    modal.hidden = false;
+    document.body.classList.add('modal-open');
+}
+
+function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove('modal-open');
+}
+
+function renderPortfolios(portfolios) {
+    if (!portfolios.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无组合数据</td></tr>';
+        portfolioSummaryText.textContent = '还没有创建任何组合';
+        return;
+    }
+
+    portfolioSummaryText.textContent = `共 ${portfolios.length} 个组合`;
+    tbody.innerHTML = portfolios.map(portfolio => `
+        <tr>
+            <td>
+                <strong>${escapeHtml(portfolio.name)}</strong>
+                ${portfolio.notes ? `<div class="table-subtext">${escapeHtml(portfolio.notes)}</div>` : ''}
+            </td>
+            <td class="text-center mono">${daysSince(portfolio.created_at)} 天</td>
+            <td class="text-end mono">${formatMoney(portfolio.summary.cost)}</td>
+            <td class="text-end mono">${formatMoney(portfolio.summary.market_value)}</td>
+            <td class="text-end mono ${toneClass(portfolio.summary.profit)}">${formatMoney(portfolio.summary.profit)}</td>
+            <td class="text-end mono ${toneClass(portfolio.summary.profit_rate)}">${formatPercent(portfolio.summary.profit_rate)}</td>
+            <td class="text-center">
+                <div class="portfolio-action-row">
+                    <a class="recap-detail-btn" href="/portfolios/${portfolio.id}">查看详情</a>
+                    <button class="recap-detail-btn portfolio-delete-btn" type="button" onclick='deletePortfolio(${portfolio.id}, ${JSON.stringify(portfolio.name)})'>删除</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function loadData() {
+    try {
+        const response = await fetch('/api/portfolios');
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error(result.detail || '加载失败');
+        }
+        renderPortfolios(result.data.portfolios || []);
+    } catch (error) {
+        console.error(error);
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state text-danger">组合数据加载失败</td></tr>';
+        portfolioSummaryText.textContent = '加载失败';
+        showToast(error.message || '组合数据加载失败', 'error');
+    }
+}
+
+async function deletePortfolio(portfolioId, portfolioName) {
+    if (!window.confirm(`确认删除组合“${portfolioName}”吗？此操作不可恢复。`)) {
+        return;
+    }
+    try {
+        const response = await fetch(`/api/portfolios/${portfolioId}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error(result.message || '删除失败');
+        }
+        showToast('组合已删除', 'success');
+        await loadData();
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || '删除失败', 'error');
+    }
+}
+
+document.getElementById('open-create-btn').addEventListener('click', openModal);
+document.getElementById('add-row-btn').addEventListener('click', () => addHoldingRow());
+modal.addEventListener('click', event => {
+    if (event.target.dataset.closeModal === 'true') {
+        closeModal();
+    }
+});
+
+form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const holdings = collectHoldingRows();
+    if (!portfolioNameInput.value.trim()) {
+        showToast('请输入组合名称', 'error');
+        return;
+    }
+    if (!holdings.length) {
+        showToast('至少添加一只股票', 'error');
+        return;
+    }
+    if (holdings.some(item => !item.code || !item.name || Number.isNaN(item.cost_price) || item.cost_price < 0 || Number.isNaN(item.shares) || item.shares <= 0)) {
+        showToast('请填写完整的持仓信息', 'error');
+        return;
+    }
+
+    submitBtn.disabled = true;
+    try {
+        const response = await fetch('/api/portfolios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: portfolioNameInput.value.trim(),
+                notes: portfolioNotesInput.value.trim(),
+                holdings,
+            }),
+        });
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error(result.message || result.detail || '创建失败');
+        }
+        showToast('组合创建成功', 'success');
+        closeModal();
+        await loadData();
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || '创建失败', 'error');
+    } finally {
+        submitBtn.disabled = false;
+    }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    addHoldingRow();
+    loadData();
+});
+
+window.deletePortfolio = deletePortfolio;
+</script>
+</body>
+</html>

@@ -31,14 +31,3 @@ class AdminMonitorStockUpdate(BaseModel):
 
 class ToggleEnabled(BaseModel):
     enabled: bool = True
-
-
-class XueqiuCubeCreate(BaseModel):
-    cube_symbol: str
-    cube_name: str
-    enabled: bool = True
-
-
-class XueqiuCubeUpdate(BaseModel):
-    cube_name: str
-    enabled: bool = True

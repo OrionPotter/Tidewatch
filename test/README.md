@@ -7,4 +7,4 @@ Current API test modules:
 - `test_portfolio_routes.py`
 - `test_stock_list_routes.py`
 - `test_tools_routes.py`
-- `test_xueqiu_routes.py`
+- `test_portfolios_routes.py`

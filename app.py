@@ -66,9 +66,9 @@ PAGE_TEMPLATES = {
     '/analysis': 'analysis.html',
     '/learn': 'learn.html',
     '/monitor': 'monitor.html',
+    '/portfolios': 'portfolio_list.html',
     '/recaps': 'recaps.html',
     '/tools': 'tools.html',
-    '/xueqiu': 'xueqiu.html',
 }
 
 
@@ -140,6 +140,10 @@ def create_app() -> FastAPI:
     @app.get('/recaps/{record_id}/edit', response_class=HTMLResponse)
     async def recap_edit_page(request: Request, record_id: int):
         return render_page('recap_form.html', request, record_id=record_id)
+
+    @app.get('/portfolios/{portfolio_id}', response_class=HTMLResponse)
+    async def custom_portfolio_detail_page(request: Request, portfolio_id: int):
+        return render_page('portfolio_detail.html', request, portfolio_id=portfolio_id)
 
     register_api_routers(app)
     register_page_routes(app)
