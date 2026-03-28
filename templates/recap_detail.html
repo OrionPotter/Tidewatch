@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>复盘详情 - Tidewatch</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+</head>
+<body>
+<div class="app-shell">
+    <section class="hero">
+        <div class="hero-head">
+            <div class="hero-title">
+                <h1 id="detail-title">复盘详情</h1>
+            </div>
+            <div class="hero-actions">
+                <a class="btn btn-outline-secondary" href="/recaps">返回列表</a>
+                <details class="recap-action-menu recap-detail-menu">
+                    <summary class="btn btn-primary">编辑</summary>
+                    <div class="recap-action-dropdown">
+                        <a class="dropdown-item" id="edit-recap-link" href="#">更新</a>
+                        <button class="dropdown-item is-danger" type="button" id="delete-recap-btn">删除</button>
+                    </div>
+                </details>
+            </div>
+        </div>
+        <div class="nav-pills-bar">
+            <a class="nav-chip" href="/">首页</a>
+            <a class="nav-chip" href="/monitor">监控</a>
+            <a class="nav-chip" href="/tools">工具</a>
+            <a class="nav-chip" href="/xueqiu">组合</a>
+            <a class="nav-chip" href="/analysis">分析</a>
+            <a class="nav-chip is-active" href="/recaps">复盘</a>
+            <a class="nav-chip" href="/learn">学习</a>
+            <a class="nav-chip" href="/admin">管理</a>
+        </div>
+    </section>
+
+    <section class="surface section section-feature">
+        <div class="section-title">
+            <div><h3 id="detail-meta">加载中...</h3></div>
+        </div>
+        <div id="recap-detail" class="recap-detail empty-state">正在加载复盘详情...</div>
+    </section>
+</div>
+
+<script src="/static/ui.js"></script>
+<script>
+const recapId = window.location.pathname.split('/').filter(Boolean)[1];
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function formatBool(value) {
+    return value ? '成功' : '失败';
+}
+
+function renderDetail(record) {
+    document.getElementById('detail-title').textContent = `${record.stock_name} 复盘`;
+    document.getElementById('detail-meta').textContent = `${record.review_date} / ${record.stock_code || '-'} / ${record.strategy_tag || '未分类'}`;
+    document.getElementById('edit-recap-link').href = `/recaps/${record.id}/edit`;
+    const detail = document.getElementById('recap-detail');
+    detail.className = 'recap-detail';
+    detail.innerHTML = `
+        <div class="recap-detail-grid">
+            <div class="recap-detail-main">
+                <div class="recap-detail-tags">
+                    <span class="badge-soft ${record.is_success ? 'badge-success-soft' : 'badge-danger-soft'}">${formatBool(record.is_success)}</span>
+                    <span class="badge-soft badge-primary-soft">${escapeHtml(record.strategy_tag || '未分类')}</span>
+                    <span class="badge-soft badge-gray-soft">盈亏比 ${record.risk_reward_ratio ?? '-'}</span>
+                </div>
+                <div class="recap-detail-fields">
+                    <div><span>股票</span><strong>${escapeHtml(record.stock_name)} ${record.stock_code ? `(${escapeHtml(record.stock_code)})` : ''}</strong></div>
+                    <div><span>止盈 / 止损</span><strong>${record.take_profit ?? '-'} / ${record.stop_loss ?? '-'}</strong></div>
+                </div>
+                <div class="recap-rich-block">
+                    <h4>复盘摘要</h4>
+                    <p>${escapeHtml(record.summary || '暂无内容').replaceAll('\n', '<br>')}</p>
+                </div>
+                <div class="recap-rich-block">
+                    <h4>经验总结</h4>
+                    <p>${escapeHtml(record.lessons_learned || '暂无内容').replaceAll('\n', '<br>')}</p>
+                </div>
+                <div class="recap-rich-block">
+                    <h4>失败原因</h4>
+                    <p>${escapeHtml(record.failure_reason || '暂无内容').replaceAll('\n', '<br>')}</p>
+                </div>
+                <div class="recap-rich-block">
+                    <h4>补充备注</h4>
+                    <p>${escapeHtml(record.notes || '暂无内容').replaceAll('\n', '<br>')}</p>
+                </div>
+            </div>
+            <aside class="recap-detail-side">
+                ${record.image_path ? `
+                    <figure class="recap-detail-image-card">
+                        <button class="recap-image-trigger" type="button" id="preview-recap-image-btn">
+                            <img class="recap-detail-image" src="${record.image_path}" alt="${escapeHtml(record.stock_name)}">
+                        </button>
+                        <figcaption class="recap-image-caption">
+                            <span>点击图片可放大查看</span>
+                            <a href="${record.image_path}" target="_blank" rel="noreferrer">打开原图</a>
+                        </figcaption>
+                    </figure>
+                ` : '<div class="empty-state">暂无截图</div>'}
+            </aside>
+        </div>
+    `;
+    const previewButton = document.getElementById('preview-recap-image-btn');
+    if (previewButton) {
+        previewButton.addEventListener('click', () => openImagePreview(record.image_path, record.stock_name));
+    }
+}
+
+function openImagePreview(imagePath, title) {
+    const existing = document.getElementById('recap-image-modal');
+    if (existing) {
+        existing.remove();
+    }
+    document.body.classList.add('modal-open');
+    const modal = document.createElement('div');
+    modal.id = 'recap-image-modal';
+    modal.className = 'recap-image-modal';
+    modal.innerHTML = `
+        <div class="recap-image-backdrop" data-close="true"></div>
+        <div class="recap-image-modal-body" role="dialog" aria-modal="true">
+            <button class="recap-image-close" type="button" id="close-recap-image-modal">&times;</button>
+            <div class="recap-image-modal-title">${escapeHtml(title || '复盘截图')}</div>
+            <img class="recap-image-modal-img" src="${imagePath}" alt="${escapeHtml(title || '复盘截图')}">
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const closeModal = () => {
+        document.body.classList.remove('modal-open');
+        modal.remove();
+    };
+    document.getElementById('close-recap-image-modal').addEventListener('click', closeModal);
+    modal.querySelector('[data-close="true"]').addEventListener('click', closeModal);
+    document.addEventListener('keydown', function onKeydown(event) {
+        if (event.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', onKeydown);
+        }
+    });
+}
+
+async function loadRecord() {
+    try {
+        const response = await fetch(`/api/recaps/${recapId}`);
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error('加载失败');
+        }
+        renderDetail(result.data.record);
+    } catch (error) {
+        console.error(error);
+        document.getElementById('detail-meta').textContent = '加载失败';
+        document.getElementById('recap-detail').className = 'recap-detail empty-state text-danger';
+        document.getElementById('recap-detail').textContent = '复盘详情加载失败';
+    }
+}
+
+async function deleteRecap() {
+    if (!window.confirm('确认删除这条复盘记录吗？')) {
+        return;
+    }
+    try {
+        const response = await fetch(`/api/recaps/${recapId}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (result.status !== 'success') {
+            throw new Error(result.detail || result.message || '删除失败');
+        }
+        window.location.href = '/recaps';
+    } catch (error) {
+        console.error(error);
+        showToast(error.message || '删除失败', 'error');
+    }
+}
+
+document.getElementById('delete-recap-btn').addEventListener('click', deleteRecap);
+document.addEventListener('DOMContentLoaded', loadRecord);
+</script>
+</body>
+</html>

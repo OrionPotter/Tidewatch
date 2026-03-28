@@ -121,6 +121,18 @@ def create_app() -> FastAPI:
     async def learn_article_page(request: Request, slug: str):
         return render_page('learn_article.html', request, slug=slug)
 
+    @app.get('/recaps/new', response_class=HTMLResponse)
+    async def recap_create_page(request: Request):
+        return render_page('recap_form.html', request)
+
+    @app.get('/recaps/{record_id}', response_class=HTMLResponse)
+    async def recap_detail_page(request: Request, record_id: int):
+        return render_page('recap_detail.html', request, record_id=record_id)
+
+    @app.get('/recaps/{record_id}/edit', response_class=HTMLResponse)
+    async def recap_edit_page(request: Request, record_id: int):
+        return render_page('recap_form.html', request, record_id=record_id)
+
     register_api_routers(app)
     register_page_routes(app)
     return app
