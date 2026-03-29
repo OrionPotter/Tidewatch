@@ -7,7 +7,7 @@
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.3.1/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/styles.css" rel="stylesheet">
 </head>
-<body>
+<body class="dashboard-home">
     <div class="app-shell">
         <section class="hero">
             <div class="hero-head">
@@ -63,7 +63,11 @@
                 </div>
             </div>
             <div id="focus-cards" class="focus-list">
-                <div class="empty-state">正在加载数据...</div>
+                <div class="empty-state-card">
+                    <div class="empty-state-mark">-</div>
+                    <div class="empty-state-title">正在加载重点股票</div>
+                    <div class="empty-state-copy">请稍候，系统正在整理今日关注标的。</div>
+                </div>
             </div>
         </section>
 
@@ -87,7 +91,7 @@
                         </tr>
                     </thead>
                     <tbody id="portfolio-body">
-                        <tr><td colspan="7" class="empty-state">正在加载数据...</td></tr>
+                        <tr><td colspan="7" class="empty-state-table">正在加载持仓数据...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -95,19 +99,47 @@
     </div>
 
     <script>
+        function safeNumber(num) {
+            const value = Number(num);
+            return Number.isFinite(value) ? value : null;
+        }
+
         function formatMoney(num) {
-            if (num === undefined || num === null || Number.isNaN(num)) return '-';
-            return Number(num).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const value = safeNumber(num);
+            if (value === null) return '-';
+            return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function formatCurrency(num) {
+            const value = safeNumber(num);
+            if (value === null) return '-';
+            return `¥${formatMoney(value)}`;
+        }
+
+        function formatSignedCurrency(num) {
+            const value = safeNumber(num);
+            if (value === null) return '-';
+            const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+            return `${sign}¥${formatMoney(Math.abs(value))}`;
         }
 
         function formatPercent(num) {
-            if (num === undefined || num === null || Number.isNaN(num)) return '-';
-            return `${(num * 100).toFixed(2)}%`;
+            const value = safeNumber(num);
+            if (value === null) return '-';
+            return `${(value * 100).toFixed(2)}%`;
         }
 
         function formatDisplayPercent(num) {
-            if (num === undefined || num === null || Number.isNaN(num)) return '-';
-            return `${Number(num).toFixed(2)}%`;
+            const value = safeNumber(num);
+            if (value === null) return '-';
+            return `${value.toFixed(2)}%`;
+        }
+
+        function formatSignedDisplayPercent(num) {
+            const value = safeNumber(num);
+            if (value === null) return '-';
+            const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+            return `${sign}${Math.abs(value).toFixed(2)}%`;
         }
 
         function badge(text, tone) {
@@ -138,10 +170,40 @@
             return (tags || []).join('、') || '-';
         }
 
+        function emptyState(message, copy) {
+            return `
+                <div class="empty-state-card">
+                    <div class="empty-state-mark">-</div>
+                    <div class="empty-state-title">${message}</div>
+                    <div class="empty-state-copy">${copy}</div>
+                </div>
+            `;
+        }
+
+        function valueToneClass(value) {
+            const amount = safeNumber(value);
+            if (amount === null || amount === 0) return 'status-neutral';
+            return amount > 0 ? 'status-positive' : 'status-negative';
+        }
+
+        function renderPriceChange(stock) {
+            const change = safeNumber(stock.change);
+            const changePct = safeNumber(stock.change_pct);
+            if (change === null && changePct === null) {
+                return '<span class="focus-card-change status-neutral mono">--</span>';
+            }
+            const toneClass = valueToneClass(change ?? changePct);
+            const segments = [];
+            if (change !== null) segments.push(formatSignedCurrency(change));
+            if (changePct !== null) segments.push(`(${formatSignedDisplayPercent(changePct)})`);
+            return `<span class="focus-card-change ${toneClass} mono">${segments.join(' ')}</span>`;
+        }
+
         async function loadData() {
             const btn = document.getElementById('refresh-btn');
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 加载中';
+
             try {
                 const response = await fetch('/api/dashboard');
                 const result = await response.json();
@@ -153,9 +215,13 @@
                 const annualDividend = Number(summary.annual_dividend) || 0;
                 const dividendYield = marketValue > 0 ? annualDividend / marketValue : null;
 
-                document.getElementById('market-value').textContent = formatMoney(summary.market_value);
-                document.getElementById('profit-value').textContent = formatMoney(summary.profit);
-                document.getElementById('dividend-value').textContent = formatMoney(summary.annual_dividend);
+                document.getElementById('market-value').textContent = formatCurrency(summary.market_value);
+
+                const profitValue = document.getElementById('profit-value');
+                profitValue.textContent = formatSignedCurrency(summary.profit);
+                profitValue.className = `metric-value mono ${valueToneClass(summary.profit)}`;
+
+                document.getElementById('dividend-value').textContent = formatCurrency(summary.annual_dividend);
                 document.getElementById('dividend-yield').textContent = formatPercent(dividendYield);
                 document.getElementById('update-time').textContent = `最后更新：${result.timestamp}`;
 
@@ -163,8 +229,8 @@
                 renderPortfolio(data.portfolio_rows || []);
             } catch (error) {
                 console.error(error);
-                document.getElementById('focus-cards').innerHTML = '<div class="empty-state text-danger">首页数据加载失败</div>';
-                document.getElementById('portfolio-body').innerHTML = '<tr><td colspan="7" class="empty-state text-danger">持仓数据加载失败</td></tr>';
+                document.getElementById('focus-cards').innerHTML = emptyState('首页数据加载失败', '请检查接口状态后重试。');
+                document.getElementById('portfolio-body').innerHTML = '<tr><td colspan="7" class="empty-state-table">持仓数据加载失败，请稍后重试。</td></tr>';
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '刷新数据';
@@ -174,11 +240,12 @@
         function renderFocusCards(items) {
             const container = document.getElementById('focus-cards');
             if (!items.length) {
-                container.innerHTML = '<div class="empty-state">暂无重点股票</div>';
+                container.innerHTML = emptyState('暂无重点股票', '当前没有满足条件的标的，稍后刷新再看。');
                 return;
             }
+
             container.innerHTML = items.slice(0, 6).map(stock => `
-                <article class="focus-card ${stock.risk_level === 'high' ? 'is-danger' : stock.action_label === '可分批' ? 'is-positive' : ''}">
+                <article class="focus-card">
                     <div class="focus-card-head">
                         <div>
                             <h4>${stock.name}</h4>
@@ -191,7 +258,10 @@
                         ${trendBadge(stock.trend)}
                         ${valuationBadge(stock.valuation_status)}
                     </div>
-                    <div class="focus-card-price mono">现价 ${formatMoney(stock.current_price)}</div>
+                    <div class="focus-card-price-row">
+                        <div class="focus-card-price mono">${formatCurrency(stock.current_price)}</div>
+                        ${renderPriceChange(stock)}
+                    </div>
                     <div class="focus-card-reasons">${reasons(stock.reason_tags)}</div>
                 </article>
             `).join('');
@@ -200,18 +270,22 @@
         function renderPortfolio(items) {
             const tbody = document.getElementById('portfolio-body');
             if (!items.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无持仓数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state-table">暂无持仓数据，添加持仓后会在这里展示。</td></tr>';
                 return;
             }
+
             tbody.innerHTML = items.map(row => `
-                <tr>
-                    <td><strong>${row.name}</strong><div class="text-muted small">${row.code}</div></td>
-                    <td class="text-end mono">${formatMoney(row.current_price)}</td>
-                    <td class="text-end mono">${formatMoney(row.cost_price)}</td>
-                    <td class="text-end mono">${Number(row.shares ?? 0).toLocaleString('zh-CN')}</td>
-                    <td class="text-end mono">${formatDisplayPercent(row.dividend_yield)}</td>
-                    <td class="text-end mono">${formatMoney(row.market_value)}</td>
-                    <td class="text-end mono ${row.profit > 0 ? 'status-positive' : row.profit < 0 ? 'status-negative' : 'status-neutral'}">${formatMoney(row.profit)}</td>
+                <tr class="portfolio-row">
+                    <td>
+                        <strong>${row.name}</strong>
+                        <div class="text-muted small">${row.code}</div>
+                    </td>
+                    <td class="text-end mono cell-num">${formatCurrency(row.current_price)}</td>
+                    <td class="text-end mono cell-num">${formatCurrency(row.cost_price)}</td>
+                    <td class="text-end mono cell-num">${Number(row.shares ?? 0).toLocaleString('zh-CN')}</td>
+                    <td class="text-end mono cell-num">${formatDisplayPercent(row.dividend_yield)}</td>
+                    <td class="text-end mono cell-num">${formatCurrency(row.market_value)}</td>
+                    <td class="text-end mono cell-num ${valueToneClass(row.profit)}">${formatSignedCurrency(row.profit)}</td>
                 </tr>
             `).join('');
         }
