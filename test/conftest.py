@@ -36,3 +36,14 @@ def client(mock_db_conn):
         register_api_routers(app)
         with TestClient(app) as test_client:
             yield test_client
+
+
+@pytest.fixture(autouse=True)
+def reset_monitor_cache():
+    from api import monitor_routes
+
+    monitor_routes._monitor_cache['data'] = None
+    monitor_routes._monitor_cache['timestamp'] = None
+    yield
+    monitor_routes._monitor_cache['data'] = None
+    monitor_routes._monitor_cache['timestamp'] = None
